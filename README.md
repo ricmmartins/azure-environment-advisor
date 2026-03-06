@@ -306,11 +306,8 @@ azure-environment-advisor/
 │   ├── startup.md                     # Assessment context for startups (5-50 eng)
 │   ├── scaleup.md                     # Assessment context for scale-ups (50-200 eng)
 │   └── enterprise.md                  # Assessment context for enterprise (200+ eng)
-├── docs/
-│   ├── getting-started.md
-│   ├── how-it-works.md
-│   ├── adding-rules.md
-│   └── azure-mcp-setup.md
+├── samples/
+│   └── sample-report.html             # Example assessment report
 ├── README.md
 └── LICENSE
 ```
@@ -335,6 +332,100 @@ azure-environment-advisor/
 - **GitHub Copilot** (CLI, VS Code, or coding agent) — as the AI runtime
 - **Azure permissions** — Reader role on subscription(s) to assess
 - **No write access needed** — the agent only reads your environment and generates a report
+
+## Getting Started
+
+### 1. Prerequisites
+
+- [GitHub Copilot](https://github.com/features/copilot) subscription (Individual, Business, or Enterprise)
+- [Azure MCP Server](https://github.com/Azure/azure-mcp-server) installed and configured
+- Azure subscription with **Reader** role (no write access needed)
+- Azure CLI authenticated (`az login`)
+
+### 2. Install Azure MCP Server
+
+```bash
+# Install via npm
+npm install -g @azure/mcp-server
+```
+
+### 3. Configure MCP Server
+
+Add the Azure MCP Server to your MCP configuration.
+
+**For VS Code** (`.vscode/mcp.json` in this repo or your user settings):
+
+```json
+{
+  "servers": {
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp-server"],
+      "env": {
+        "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
+      }
+    }
+  }
+}
+```
+
+**For GitHub Copilot CLI** (`~/.config/github-copilot/mcp.json`):
+
+```json
+{
+  "servers": {
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp-server"],
+      "env": {
+        "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
+      }
+    }
+  }
+}
+```
+
+> **Authentication:** The Azure MCP Server uses your Azure CLI credentials. Run `az login` before starting.
+
+### 4. Clone This Repository
+
+```bash
+git clone https://github.com/ricmmartins/azure-environment-advisor.git
+cd azure-environment-advisor
+```
+
+### 5. Run the Assessment
+
+Open the project in your Copilot-enabled environment, then ask:
+
+**In VS Code (Copilot Chat — Agent mode):**
+```
+Assess my Azure subscription
+```
+
+**In GitHub Copilot CLI:**
+```
+Assess my Azure subscription abc-12345-def-67890
+```
+
+The agent will:
+1. Connect to your subscription via Azure MCP Server
+2. Run the Resource Graph queries from `queries/`
+3. Profile your environment (startup / scale-up / enterprise)
+4. Evaluate against all rules in `rules/`
+5. Generate a self-contained HTML dashboard
+
+### 6. View the Report
+
+The agent generates a single HTML file (e.g., `assessment-contoso-prod-2026-03-06.html`). Open it in any browser — no server required. You can also share it via email or attach it to a compliance review.
+
+### Customization
+
+**Add your own rules:** Create a new `.md` file in the appropriate `rules/` subfolder following the existing format. The agent automatically picks up all rules.
+
+**Adjust severity for your context:** Edit the profile files in `profiles/` to change how severity is calibrated for your company stage.
+
+**Modify queries:** Add or edit `.kql` files in `queries/resource-graph/` to expand what the agent discovers.
 
 ## Future Possibilities
 

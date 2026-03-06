@@ -1,0 +1,24 @@
+// Resource deletions in last 30 days
+AzureActivity
+| where TimeGenerated > ago(30d)
+| where OperationNameValue endswith "delete"
+| where ActivityStatusValue == "Success"
+| project TimeGenerated, Caller, ResourceGroup, Resource=_ResourceId, OperationNameValue
+| order by TimeGenerated desc
+
+// Role assignment changes
+AzureActivity
+| where TimeGenerated > ago(30d)
+| where OperationNameValue contains "roleAssignments"
+| where ActivityStatusValue == "Success"
+| project TimeGenerated, Caller, OperationNameValue, Properties_d
+| order by TimeGenerated desc
+
+// High-impact operations (policy changes, subscription-level changes)
+AzureActivity
+| where TimeGenerated > ago(30d)
+| where CategoryValue == "Administrative"
+| where OperationNameValue contains "policyAssignments" or OperationNameValue contains "locks" or OperationNameValue contains "subscriptions"
+| where ActivityStatusValue == "Success"
+| project TimeGenerated, Caller, OperationNameValue, ResourceGroup
+| order by TimeGenerated desc

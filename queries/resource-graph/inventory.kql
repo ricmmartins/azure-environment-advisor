@@ -1,0 +1,30 @@
+// Resource count by type, location, and resource group
+resources
+| summarize count() by type, location, resourceGroup
+| order by count_ desc
+
+// Resource types summary
+resources
+| summarize ResourceCount=count() by type
+| order by ResourceCount desc
+
+// Resources by region
+resources
+| summarize ResourceCount=count() by location
+| order by ResourceCount desc
+
+// Resource groups with resource counts
+resources
+| summarize ResourceCount=count() by resourceGroup, location
+| order by ResourceCount desc
+
+// Subscription-level overview
+resources
+| summarize TotalResources=count(), Regions=dcount(location), ResourceGroups=dcount(resourceGroup), ResourceTypes=dcount(type)
+
+// Tag coverage analysis
+resources
+| extend HasEnvironmentTag = tags contains "environment" or tags contains "env"
+| extend HasOwnerTag = tags contains "owner"
+| extend HasCostCenterTag = tags contains "cost-center" or tags contains "costcenter"
+| summarize Total=count(), WithEnvironment=countif(HasEnvironmentTag), WithOwner=countif(HasOwnerTag), WithCostCenter=countif(HasCostCenterTag)

@@ -1,0 +1,20 @@
+// Security alerts from Defender for Cloud
+SecurityAlert
+| where TimeGenerated > ago(30d)
+| summarize AlertCount=count() by AlertName, AlertSeverity, ProviderName
+| order by AlertCount desc
+
+// Just-In-Time VM access requests
+AzureActivity
+| where TimeGenerated > ago(30d)
+| where OperationNameValue == "Microsoft.Security/locations/jitNetworkAccessPolicies/initiate/action"
+| project TimeGenerated, Caller, ResourceGroup
+| order by TimeGenerated desc
+
+// Key Vault access events (sensitive operations)
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.KEYVAULT"
+| where TimeGenerated > ago(7d)
+| where OperationName in ("SecretGet", "SecretSet", "SecretDelete", "KeyGet", "KeyCreate", "KeyDelete")
+| summarize count() by OperationName, CallerIPAddress, identity_claim_upn_s
+| order by count_ desc

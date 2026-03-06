@@ -1,0 +1,36 @@
+// Role assignments by principal type
+authorizationresources
+| where type == "microsoft.authorization/roleassignments"
+| extend principalType = tostring(properties.principalType)
+| extend roleDefinitionId = tostring(properties.roleDefinitionId)
+| extend scope = tostring(properties.scope)
+| summarize count() by principalType
+
+// Direct user assignments (not groups)
+authorizationresources
+| where type == "microsoft.authorization/roleassignments"
+| where properties.principalType == "User"
+| extend roleDefinitionId = tostring(properties.roleDefinitionId)
+| extend scope = tostring(properties.scope)
+| project principalId=properties.principalId, roleDefinitionId, scope
+
+// Owner and Contributor role assignments at subscription scope
+authorizationresources
+| where type == "microsoft.authorization/roleassignments"
+| where properties.roleDefinitionId endswith "8e3af657-a8ff-443c-a75c-2fe8c4bcb635" or properties.roleDefinitionId endswith "b24988ac-6180-42a0-ab88-20f7382dd24c"
+| extend principalType = tostring(properties.principalType)
+| extend roleName = iff(tostring(properties.roleDefinitionId) endswith "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", "Owner", "Contributor")
+| project principalType, roleName, scope=properties.scope
+
+// Managed identity usage
+resources
+| where type in~ ("microsoft.web/sites", "microsoft.compute/virtualmachines", "microsoft.containerservice/managedclusters", "microsoft.web/sites/slots")
+| extend hasSystemIdentity = isnotnull(identity) and identity.type contains "SystemAssigned"
+| extend hasUserIdentity = isnotnull(identity) and identity.type contains "UserAssigned"
+| project name, type, resourceGroup, hasSystemIdentity, hasUserIdentity
+
+// Service principal role assignments
+authorizationresources
+| where type == "microsoft.authorization/roleassignments"
+| where properties.principalType == "ServicePrincipal"
+| summarize count() by roleDefinitionId=tostring(properties.roleDefinitionId)

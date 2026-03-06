@@ -1,0 +1,55 @@
+// Virtual Networks with subnets and address spaces
+resources
+| where type =~ "microsoft.network/virtualnetworks"
+| extend addressSpace = properties.addressSpace.addressPrefixes
+| extend subnets = properties.subnets
+| mv-expand subnet = subnets
+| project vnetName=name, resourceGroup, location, addressSpace,
+          subnetName=subnet.name, subnetPrefix=subnet.properties.addressPrefix,
+          nsgId=subnet.properties.networkSecurityGroup.id
+
+// Subnets without NSGs (excluding system subnets)
+resources
+| where type =~ "microsoft.network/virtualnetworks"
+| extend subnets = properties.subnets
+| mv-expand subnet = subnets
+| where isempty(subnet.properties.networkSecurityGroup.id)
+| where subnet.name !in ("AzureBastionSubnet", "GatewaySubnet", "AzureFirewallSubnet", "AzureFirewallManagementSubnet", "RouteServerSubnet")
+| project vnetName=name, subnetName=tostring(subnet.name), resourceGroup
+
+// Network Security Groups and their associations
+resources
+| where type =~ "microsoft.network/networksecuritygroups"
+| project name, resourceGroup, location, subnets=properties.subnets, nics=properties.networkInterfaces
+
+// Public IP addresses and their assignments
+resources
+| where type =~ "microsoft.network/publicipaddresses"
+| extend assignedTo = properties.ipConfiguration.id
+| extend isAssociated = isnotempty(assignedTo)
+| project name, resourceGroup, ipAddress=properties.ipAddress, allocationMethod=properties.publicIPAllocationMethod, isAssociated, assignedTo
+
+// VNet peerings
+resources
+| where type =~ "microsoft.network/virtualnetworks"
+| extend peerings = properties.virtualNetworkPeerings
+| mv-expand peering = peerings
+| project vnetName=name, peeringName=peering.name, remoteVnet=peering.properties.remoteVirtualNetwork.id, peeringState=peering.properties.peeringState
+
+// Private Endpoints
+resources
+| where type =~ "microsoft.network/privateendpoints"
+| extend privateLinkResource = properties.privateLinkServiceConnections[0].properties.privateLinkServiceId
+| extend groupIds = properties.privateLinkServiceConnections[0].properties.groupIds
+| project name, resourceGroup, privateLinkResource, groupIds
+
+// Azure Firewall instances
+resources
+| where type =~ "microsoft.network/azurefirewalls"
+| project name, resourceGroup, location, sku=properties.sku, threatIntelMode=properties.threatIntelMode
+
+// Route tables
+resources
+| where type =~ "microsoft.network/routetables"
+| extend routes = properties.routes
+| project name, resourceGroup, routeCount=array_length(routes), subnets=properties.subnets

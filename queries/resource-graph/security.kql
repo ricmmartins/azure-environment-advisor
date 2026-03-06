@@ -1,0 +1,38 @@
+// Defender for Cloud pricing tiers
+securityresources
+| where type == "microsoft.security/pricings"
+| project planName=name, pricingTier=properties.pricingTier, freeTrialRemainingTime=properties.freeTrialRemainingTime
+
+// Secure Score
+securityresources
+| where type == "microsoft.security/securescores"
+| project name, currentScore=properties.score.current, maxScore=properties.score.max, percentage=properties.score.percentage
+
+// Defender recommendations by severity
+securityresources
+| where type == "microsoft.security/assessments"
+| where properties.status.code == "Unhealthy"
+| extend severity = tostring(properties.metadata.severity)
+| summarize count() by severity
+
+// Resources with public network access enabled
+resources
+| where type in~ ("microsoft.sql/servers", "microsoft.dbforpostgresql/flexibleservers", "microsoft.dbformysql/flexibleservers", "microsoft.documentdb/databaseaccounts", "microsoft.keyvault/vaults", "microsoft.storage/storageaccounts")
+| where properties.publicNetworkAccess =~ "Enabled" or properties.publicNetworkAccess =~ "true"
+| project name, type, resourceGroup, publicNetworkAccess=properties.publicNetworkAccess
+
+// Storage accounts with public blob access
+resources
+| where type =~ "microsoft.storage/storageaccounts"
+| extend allowBlobPublicAccess = properties.allowBlobPublicAccess
+| extend httpsOnly = properties.supportsHttpsTrafficOnly
+| extend minimumTlsVersion = properties.minimumTlsVersion
+| project name, resourceGroup, allowBlobPublicAccess, httpsOnly, minimumTlsVersion, sku=sku.name
+
+// Key Vault configuration
+resources
+| where type =~ "microsoft.keyvault/vaults"
+| extend enableRbacAuthorization = properties.enableRbacAuthorization
+| extend enableSoftDelete = properties.enableSoftDelete
+| extend enablePurgeProtection = properties.enablePurgeProtection
+| project name, resourceGroup, enableRbacAuthorization, enableSoftDelete, enablePurgeProtection

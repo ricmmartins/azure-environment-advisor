@@ -1,0 +1,22 @@
+// Failed sign-in attempts in last 7 days
+SigninLogs
+| where TimeGenerated > ago(7d)
+| where ResultType != "0"
+| summarize FailedAttempts=count() by UserPrincipalName, IPAddress, ResultDescription
+| order by FailedAttempts desc
+| take 20
+
+// Sign-ins from unusual locations
+SigninLogs
+| where TimeGenerated > ago(30d)
+| where ResultType == "0"
+| summarize Locations=make_set(Location), LocationCount=dcount(Location) by UserPrincipalName
+| where LocationCount > 3
+| order by LocationCount desc
+
+// Risky sign-ins
+SigninLogs
+| where TimeGenerated > ago(30d)
+| where RiskLevelDuringSignIn in ("medium", "high")
+| project TimeGenerated, UserPrincipalName, IPAddress, Location, RiskLevelDuringSignIn, RiskState
+| order by TimeGenerated desc

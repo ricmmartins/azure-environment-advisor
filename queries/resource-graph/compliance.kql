@@ -1,0 +1,23 @@
+// Policy assignments
+policyresources
+| where type == "microsoft.authorization/policyassignments"
+| project name, displayName=properties.displayName, scope=properties.scope, policyDefinitionId=properties.policyDefinitionId, enforcementMode=properties.enforcementMode
+
+// Non-compliant resources by policy
+policyresources
+| where type == "microsoft.policyinsights/policystates"
+| where properties.complianceState == "NonCompliant"
+| summarize NonCompliantCount=count() by PolicyDefinition=tostring(properties.policyDefinitionName), PolicyAssignment=tostring(properties.policyAssignmentName)
+| order by NonCompliantCount desc
+
+// Overall compliance summary
+policyresources
+| where type == "microsoft.policyinsights/policystates"
+| summarize Total=count(), Compliant=countif(properties.complianceState == "Compliant"), NonCompliant=countif(properties.complianceState == "NonCompliant")
+| extend CompliancePercentage = round(100.0 * Compliant / Total, 1)
+
+// Policy initiatives (initiative assignments)
+policyresources
+| where type == "microsoft.authorization/policyassignments"
+| where properties.policyDefinitionId contains "policySetDefinitions"
+| project name, displayName=properties.displayName, initiativeId=properties.policyDefinitionId
