@@ -1,6 +1,6 @@
 # Azure Environment Advisor
 
-An AI-powered agent that authenticates to your Azure subscription, assesses your environment against best practices, and generates actionable remediation code — tailored to your company's stage and architecture.
+An AI-powered agent that connects to your Azure subscription, assesses your environment against best practices, and generates an interactive HTML report with findings and Microsoft Learn documentation links — tailored to your company's stage and architecture.
 
 ## The Problem
 
@@ -14,7 +14,7 @@ Teams deploying on Azure today face a fragmented landscape of advisory tools:
 | Azure Resource Graph | Resource inventory queries | Raw data — no intelligence or recommendation layer |
 | Cost Management | Spending analysis + budget alerts | Cost-only, no connection to architecture decisions |
 
-**The gap:** No single tool connects to your actual environment, assesses it holistically across all Well-Architected pillars, contextualizes recommendations for your company stage, and generates IaC code to fix what it finds.
+**The gap:** No single tool connects to your actual environment, assesses it holistically across all Well-Architected pillars, contextualizes recommendations for your company stage, and produces an actionable report with direct links to the relevant Microsoft Learn documentation.
 
 ## The Solution
 
@@ -40,14 +40,14 @@ An AI agent (powered by GitHub Copilot + Azure MCP Server) that:
 │  Azure Environment Advisor Agent                            │
 │                                                             │
 │  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐ │
-│  │ Discovery    │  │ Assessment   │  │ Remediation        │ │
-│  │ Engine       │→ │ Engine       │→ │ Engine             │ │
+│  │ Discovery    │  │ Assessment   │  │ Report             │ │
+│  │ Engine       │→ │ Engine       │→ │ Generator          │ │
 │  │              │  │              │  │                    │ │
-│  │ • Resources  │  │ • WAF Rules  │  │ • Bicep generator  │ │
-│  │ • Configs    │  │ • CAF Rules  │  │ • Terraform gen    │ │
-│  │ • Policies   │  │ • ALZ Rules  │  │ • Script gen       │ │
-│  │ • Networking │  │ • Custom     │  │ • Priority order   │ │
-│  │ • RBAC       │  │   Rules      │  │                    │ │
+│  │ • Resources  │  │ • WAF Rules  │  │ • HTML dashboard   │ │
+│  │ • Configs    │  │ • CAF Rules  │  │ • Severity scores  │ │
+│  │ • Policies   │  │ • ALZ Rules  │  │ • MS Learn links   │ │
+│  │ • Networking │  │ • Custom     │  │ • Pillar breakdown │ │
+│  │ • RBAC       │  │   Rules      │  │ • Filters          │ │
 │  │ • Defender   │  │              │  │                    │ │
 │  │ • Monitoring │  │ Contextual:  │  │                    │ │
 │  │ • Budgets    │  │ • Stage      │  │                    │ │
@@ -204,19 +204,19 @@ The agent produces a findings report organized by severity and pillar:
 ║  Pillar: Security | Resource: sql-contoso-prod               ║
 ║  Risk: Database accessible from internet                     ║
 ║  Fix: Enable Private Endpoint + disable public access        ║
-║  → Remediation code generated (Bicep + Terraform)            ║
+║  → docs.microsoft.com/azure/private-link/...                 ║
 ║                                                              ║
 ║  [SEC-002] Defender for Cloud not enabled                    ║
 ║  Pillar: Security | Scope: Subscription                      ║
 ║  Risk: No threat detection, no secure score                  ║
 ║  Fix: Enable CSPM (free) + Servers P2 (prod)                ║
-║  → Remediation code generated (Bicep + Terraform)            ║
+║  → docs.microsoft.com/azure/defender-for-cloud/...           ║
 ║                                                              ║
 ║  [OPS-001] No diagnostic settings configured                 ║
 ║  Pillar: Operational Excellence | Scope: Subscription        ║
 ║  Risk: No audit trail, no visibility into operations         ║
 ║  Fix: Deploy Log Analytics + Activity Log forwarding         ║
-║  → Remediation code generated (Bicep + Terraform)            ║
+║  → docs.microsoft.com/azure/azure-monitor/...                ║
 ║                                                              ║
 ║  HIGH FINDINGS                                               ║
 ║  ...                                                         ║
@@ -253,7 +253,7 @@ The agent's intelligence comes from a `.github/copilot-instructions.md` file tha
 **Context:**
 - Startup: Flag as High (may need public access during early development)
 - Scale-up/Enterprise: Flag as Critical
-**Remediation:** [Bicep template] [Terraform template]
+**Learn More:** [Microsoft Learn link for remediation guidance]
 ```
 
 ## Project Structure
@@ -302,19 +302,6 @@ azure-environment-advisor/
 │       ├── sign-in-anomalies.kql
 │       ├── resource-changes.kql
 │       └── security-events.kql
-├── remediation/
-│   ├── bicep/                         # Bicep remediation templates
-│   │   ├── enable-defender.bicep
-│   │   ├── configure-nsg.bicep
-│   │   ├── setup-diagnostics.bicep
-│   │   ├── configure-budget.bicep
-│   │   └── ...
-│   └── terraform/                     # Terraform remediation templates
-│       ├── enable-defender.tf
-│       ├── configure-nsg.tf
-│       ├── setup-diagnostics.tf
-│       ├── configure-budget.tf
-│       └── ...
 ├── profiles/
 │   ├── startup.md                     # Assessment context for startups (5-50 eng)
 │   ├── scaleup.md                     # Assessment context for scale-ups (50-200 eng)
@@ -335,7 +322,7 @@ azure-environment-advisor/
 | Scans actual resources | ✅ | ✅ (security only) | ❌ (self-reported) | ✅ |
 | All WAF pillars | Partial | Security only | ✅ (manual) | ✅ (automated) |
 | Stage-aware recommendations | ❌ | ❌ | ❌ | ✅ |
-| Generates IaC remediation | ❌ | ❌ | ❌ | ✅ |
+| Links to MS Learn docs per finding | ❌ | ❌ | ❌ | ✅ |
 | Landing zone maturity assessment | ❌ | ❌ | ❌ | ✅ |
 | Conversational (ask follow-ups) | ❌ | ❌ | ❌ | ✅ |
 | Compares to SSLZ/ALZ patterns | ❌ | ❌ | ❌ | ✅ |
@@ -347,7 +334,7 @@ azure-environment-advisor/
 - **Azure MCP Server** — for read-only subscription access
 - **GitHub Copilot** (CLI, VS Code, or coding agent) — as the AI runtime
 - **Azure permissions** — Reader role on subscription(s) to assess
-- **No write access needed** for assessment — remediation code is generated but applied by the user
+- **No write access needed** — the agent only reads your environment and generates a report
 
 ## Future Possibilities
 
