@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azure Environment Assessment — contoso-prod</title>
+<style>
+  :root {
+    --critical: #d13438;
+    --high: #e97548;
+    --medium: #eaa300;
+    --low: #0078d4;
+    --pass: #107c10;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #242424;
+    --text-secondary: #616161;
+    --border: #e0e0e0;
+    --hover: #f5f5f5;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+  .header { background: linear-gradient(135deg, #0078d4, #005a9e); color: white; padding: 2rem 2rem 1.5rem; }
+  .header h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .header .subtitle { opacity: 0.85; font-size: 0.95rem; }
+  .header .meta { display: flex; gap: 2rem; margin-top: 1rem; font-size: 0.85rem; opacity: 0.8; flex-wrap: wrap; }
+  .header .meta span { display: flex; align-items: center; gap: 0.35rem; }
+
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; padding: 1.5rem 2rem; margin-top: -1rem; }
+  .summary-card { background: var(--card); border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--border); }
+  .summary-card.critical { border-left-color: var(--critical); }
+  .summary-card.high { border-left-color: var(--high); }
+  .summary-card.medium { border-left-color: var(--medium); }
+  .summary-card.low { border-left-color: var(--low); }
+  .summary-card.pass { border-left-color: var(--pass); }
+  .summary-card .count { font-size: 2rem; font-weight: 700; }
+  .summary-card .label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .section { padding: 1.5rem 2rem; }
+  .section h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .pillar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+  .pillar-card { background: var(--card); border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); text-align: center; }
+  .pillar-card .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .pillar-card .name { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .pillar-score { position: relative; width: 80px; height: 80px; margin: 0 auto 0.5rem; }
+  .pillar-score svg { transform: rotate(-90deg); }
+  .pillar-score .score-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem; font-weight: 700; }
+  .pillar-card .detail { font-size: 0.75rem; color: var(--text-secondary); }
+
+  .filters { padding: 0 2rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .filters label { font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem; }
+  .filter-btn { padding: 0.35rem 0.85rem; border-radius: 20px; border: 1px solid var(--border); background: var(--card); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+  .filter-btn:hover { background: var(--hover); }
+  .filter-btn.active { background: #0078d4; color: white; border-color: #0078d4; }
+  .filter-btn .badge { background: rgba(0,0,0,0.1); padding: 0.1rem 0.4rem; border-radius: 10px; font-size: 0.7rem; margin-left: 0.25rem; }
+  .filter-btn.active .badge { background: rgba(255,255,255,0.3); }
+
+  .findings { padding: 1rem 2rem 2rem; }
+  .finding { background: var(--card); border-radius: 12px; margin-bottom: 0.75rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+  .finding-header { padding: 1rem 1.25rem; cursor: pointer; display: grid; grid-template-columns: auto 1fr auto auto; gap: 1rem; align-items: center; }
+  .finding-header:hover { background: var(--hover); }
+  .severity-badge { padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: white; white-space: nowrap; }
+  .severity-badge.critical { background: var(--critical); }
+  .severity-badge.high { background: var(--high); }
+  .severity-badge.medium { background: var(--medium); }
+  .severity-badge.low { background: var(--low); }
+  .finding-title { font-weight: 600; font-size: 0.95rem; }
+  .finding-resource { font-size: 0.8rem; color: var(--text-secondary); }
+  .pillar-tag { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; background: #f0f0f0; color: var(--text-secondary); white-space: nowrap; }
+  .chevron { font-size: 1.2rem; color: var(--text-secondary); transition: transform 0.2s; }
+  .finding.open .chevron { transform: rotate(90deg); }
+  .finding-body { display: none; padding: 0 1.25rem 1.25rem; border-top: 1px solid var(--border); }
+  .finding.open .finding-body { display: block; padding-top: 1.25rem; }
+
+  .finding-body h4 { font-size: 0.85rem; font-weight: 600; margin: 1rem 0 0.5rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+  .finding-body h4:first-child { margin-top: 0; }
+  .finding-body p { font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .doc-link { display: inline-flex; align-items: center; gap: 0.3rem; color: #0078d4; text-decoration: none; font-size: 0.85rem; font-weight: 500; padding: 0.4rem 0.75rem; background: #f0f6ff; border-radius: 6px; margin: 0.25rem 0.25rem 0.25rem 0; }
+  .doc-link:hover { background: #e0efff; text-decoration: underline; }
+
+  .footer { padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 1rem; }
+  .footer a { color: #0078d4; text-decoration: none; }
+
+  @media print {
+    .filters, .chevron { display: none !important; }
+    .finding-body { display: block !important; padding-top: 1rem !important; }
+    .finding { break-inside: avoid; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Azure Environment Assessment</h1>
+  <div class="subtitle">contoso-prod — Subscription abc-12345-def-67890</div>
+  <div class="meta">
+    <span>📅 March 6, 2026</span>
+    <span>👤 Profile: Startup (~15 engineers)</span>
+    <span>🌎 Region: East US 2</span>
+    <span>📦 47 resources scanned</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-card critical">
+    <div class="count" style="color: var(--critical)">3</div>
+    <div class="label">Critical</div>
+  </div>
+  <div class="summary-card high">
+    <div class="count" style="color: var(--high)">5</div>
+    <div class="label">High</div>
+  </div>
+  <div class="summary-card medium">
+    <div class="count" style="color: var(--medium)">8</div>
+    <div class="label">Medium</div>
+  </div>
+  <div class="summary-card low">
+    <div class="count" style="color: var(--low)">4</div>
+    <div class="label">Low</div>
+  </div>
+  <div class="summary-card pass">
+    <div class="count" style="color: var(--pass)">22</div>
+    <div class="label">Passed</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📊 Assessment by Pillar</h2>
+  <div class="pillar-grid">
+    <div class="pillar-card">
+      <div class="icon">🛡️</div>
+      <div class="pillar-score">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#d13438" stroke-width="6" stroke-dasharray="88 220" stroke-linecap="round"/>
+        </svg>
+        <span class="score-text" style="color: var(--critical)">40%</span>
+      </div>
+      <div class="name">Security</div>
+      <div class="detail">3 critical · 2 high · 1 medium</div>
+    </div>
+    <div class="pillar-card">
+      <div class="icon">🔄</div>
+      <div class="pillar-score">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#eaa300" stroke-width="6" stroke-dasharray="132 220" stroke-linecap="round"/>
+        </svg>
+        <span class="score-text" style="color: var(--medium)">60%</span>
+      </div>
+      <div class="name">Reliability</div>
+      <div class="detail">1 high · 3 medium · 1 low</div>
+    </div>
+    <div class="pillar-card">
+      <div class="icon">💰</div>
+      <div class="pillar-score">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e97548" stroke-width="6" stroke-dasharray="110 220" stroke-linecap="round"/>
+        </svg>
+        <span class="score-text" style="color: var(--high)">50%</span>
+      </div>
+      <div class="name">Cost</div>
+      <div class="detail">1 high · 2 medium · 1 low</div>
+    </div>
+    <div class="pillar-card">
+      <div class="icon">⚙️</div>
+      <div class="pillar-score">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#eaa300" stroke-width="6" stroke-dasharray="154 220" stroke-linecap="round"/>
+        </svg>
+        <span class="score-text" style="color: var(--medium)">70%</span>
+      </div>
+      <div class="name">Operations</div>
+      <div class="detail">1 high · 2 medium · 1 low</div>
+    </div>
+    <div class="pillar-card">
+      <div class="icon">⚡</div>
+      <div class="pillar-score">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#107c10" stroke-width="6" stroke-dasharray="176 220" stroke-linecap="round"/>
+        </svg>
+        <span class="score-text" style="color: var(--pass)">80%</span>
+      </div>
+      <div class="name">Performance</div>
+      <div class="detail">1 low</div>
+    </div>
+    <div class="pillar-card">
+      <div class="icon">🏛️</div>
+      <div class="pillar-score">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e0e0e0" stroke-width="6"/>
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#e97548" stroke-width="6" stroke-dasharray="110 220" stroke-linecap="round"/>
+        </svg>
+        <span class="score-text" style="color: var(--high)">50%</span>
+      </div>
+      <div class="name">Governance</div>
+      <div class="detail">1 high · 2 medium</div>
+    </div>
+  </div>
+</div>
+
+<div class="filters">
+  <label>Severity:</label>
+  <button class="filter-btn active" onclick="filterFindings('all', this)">All <span class="badge">20</span></button>
+  <button class="filter-btn" onclick="filterFindings('critical', this)">Critical <span class="badge">3</span></button>
+  <button class="filter-btn" onclick="filterFindings('high', this)">High <span class="badge">5</span></button>
+  <button class="filter-btn" onclick="filterFindings('medium', this)">Medium <span class="badge">8</span></button>
+  <button class="filter-btn" onclick="filterFindings('low', this)">Low <span class="badge">4</span></button>
+  <span style="margin-left: auto;"></span>
+  <label>Pillar:</label>
+  <button class="filter-btn active" onclick="filterPillar('all', this)">All</button>
+  <button class="filter-btn" onclick="filterPillar('security', this)">🛡️ Security</button>
+  <button class="filter-btn" onclick="filterPillar('reliability', this)">🔄 Reliability</button>
+  <button class="filter-btn" onclick="filterPillar('cost', this)">💰 Cost</button>
+  <button class="filter-btn" onclick="filterPillar('operations', this)">⚙️ Operations</button>
+  <button class="filter-btn" onclick="filterPillar('performance', this)">⚡ Performance</button>
+  <button class="filter-btn" onclick="filterPillar('governance', this)">🏛️ Governance</button>
+</div>
+
+<div class="findings">
+
+  <!-- SEC-001 Critical -->
+  <div class="finding open" data-severity="critical" data-pillar="security">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge critical">Critical</span>
+      <div>
+        <div class="finding-title">SEC-001 — Azure SQL has public endpoint enabled</div>
+        <div class="finding-resource">sql-contoso-prod · rg-contoso-data-prod</div>
+      </div>
+      <span class="pillar-tag">🛡️ Security</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Azure SQL Server <code>sql-contoso-prod</code> has <code>publicNetworkAccess: Enabled</code> with no Private Endpoint configured. The database is accessible from the public internet, relying only on firewall rules and authentication for protection.</p>
+      <h4>Why it matters</h4>
+      <p>Public endpoints expose databases to brute-force attacks, credential stuffing, and potential data exfiltration. Even with strong authentication, the attack surface is unnecessarily large.</p>
+      <h4>Recommendation</h4>
+      <p>Deploy a Private Endpoint for the SQL Server in the <code>snet-data</code> subnet, create the required Private DNS Zone, and disable public network access.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview" target="_blank">📘 Private Endpoints for Azure SQL Database</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/private-link/private-endpoint-overview" target="_blank">📘 What is Azure Private Endpoint?</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-sql/database/connectivity-architecture" target="_blank">📘 Azure SQL connectivity architecture</a>
+    </div>
+  </div>
+
+  <!-- SEC-002 Critical -->
+  <div class="finding" data-severity="critical" data-pillar="security">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge critical">Critical</span>
+      <div>
+        <div class="finding-title">SEC-002 — Defender for Cloud not enabled</div>
+        <div class="finding-resource">Subscription scope · contoso-prod</div>
+      </div>
+      <span class="pillar-tag">🛡️ Security</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Microsoft Defender for Cloud has no plans enabled on this subscription. There is no Secure Score, no security recommendations, and no threat detection running.</p>
+      <h4>Why it matters</h4>
+      <p>Without Defender, you have zero visibility into security posture. CSPM (free tier) provides Secure Score and recommendations at no cost. Defender for Servers P2 adds endpoint detection and vulnerability scanning for ~$15/server/month.</p>
+      <h4>Recommendation</h4>
+      <p>Enable CSPM (free) immediately. Enable Defender for Servers P2, Key Vault, ARM, and Containers on the production subscription. Configure a security contact email for alert notifications.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/defender-for-cloud/get-started" target="_blank">📘 Get started with Defender for Cloud</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/defender-for-cloud/defender-for-servers-introduction" target="_blank">📘 Defender for Servers overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/defender-for-cloud/secure-score-security-controls" target="_blank">📘 Secure Score in Defender for Cloud</a>
+    </div>
+  </div>
+
+  <!-- OPS-001 Critical -->
+  <div class="finding" data-severity="critical" data-pillar="operations">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge critical">Critical</span>
+      <div>
+        <div class="finding-title">OPS-001 — No diagnostic settings configured</div>
+        <div class="finding-resource">Subscription scope · contoso-prod</div>
+      </div>
+      <span class="pillar-tag">⚙️ Operations</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>No subscription-level diagnostic settings exist. Activity Log events (who deployed, modified, or deleted resources) are not being forwarded to any Log Analytics workspace.</p>
+      <h4>Why it matters</h4>
+      <p>Without Activity Log forwarding, you have no audit trail. If a resource is deleted or a role assignment is changed, there's no way to investigate who did it or when.</p>
+      <h4>Recommendation</h4>
+      <p>Deploy a Log Analytics workspace and configure subscription-level diagnostic settings to forward all 8 Activity Log categories (Administrative, Security, ServiceHealth, Alert, Recommendation, Policy, Autoscale, ResourceHealth).</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-monitor/essentials/activity-log" target="_blank">📘 Azure Activity Log overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-monitor/essentials/diagnostic-settings" target="_blank">📘 Diagnostic settings in Azure Monitor</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-monitor/logs/log-analytics-workspace-overview" target="_blank">📘 Log Analytics workspace overview</a>
+    </div>
+  </div>
+
+  <!-- SEC-003 High -->
+  <div class="finding" data-severity="high" data-pillar="security">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge high">High</span>
+      <div>
+        <div class="finding-title">SEC-003 — NSG missing on subnet snet-app</div>
+        <div class="finding-resource">vnet-contoso-prod/snet-app · rg-contoso-networking-prod</div>
+      </div>
+      <span class="pillar-tag">🛡️ Security</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Subnet <code>snet-app</code> in <code>vnet-contoso-prod</code> has no Network Security Group associated. All inbound and outbound traffic is allowed by default.</p>
+      <h4>Why it matters</h4>
+      <p>Without an NSG, there is no network-level access control on the subnet. Any resource deployed here is exposed to all traffic within the VNet and potentially from peered networks.</p>
+      <h4>Recommendation</h4>
+      <p>Create an NSG with a deny-all-inbound default rule and associate it with the subnet. Add explicit allow rules only for required traffic patterns.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/virtual-network/network-security-groups-overview" target="_blank">📘 Network Security Groups overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/virtual-network/manage-network-security-group" target="_blank">📘 Create and manage NSGs</a>
+    </div>
+  </div>
+
+  <!-- SEC-004 High -->
+  <div class="finding" data-severity="high" data-pillar="security">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge high">High</span>
+      <div>
+        <div class="finding-title">SEC-004 — RBAC assigned to individual users, not groups</div>
+        <div class="finding-resource">12 direct role assignments found</div>
+      </div>
+      <span class="pillar-tag">🛡️ Security</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>12 role assignments are assigned directly to individual user principals instead of Entra ID security groups. This includes 2 Owner assignments and 4 Contributor assignments at subscription scope.</p>
+      <h4>Why it matters</h4>
+      <p>Direct user assignments create management overhead and security risk. When employees leave, their access must be individually revoked. Group-based assignment ensures consistent access management.</p>
+      <h4>Recommendation</h4>
+      <p>Create Entra ID security groups (<code>sg-azure-admins</code>, <code>sg-azure-developers</code>), assign Azure roles to these groups, add users to appropriate groups, and remove direct user role assignments.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/role-based-access-control/best-practices" target="_blank">📘 Azure RBAC best practices</a>
+      <a class="doc-link" href="https://learn.microsoft.com/entra/fundamentals/concept-learn-about-groups" target="_blank">📘 Learn about groups in Entra ID</a>
+    </div>
+  </div>
+
+  <!-- COST-001 High -->
+  <div class="finding" data-severity="high" data-pillar="cost">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge high">High</span>
+      <div>
+        <div class="finding-title">COST-001 — No budget alerts configured</div>
+        <div class="finding-resource">Subscription scope · contoso-prod</div>
+      </div>
+      <span class="pillar-tag">💰 Cost</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>No Azure Consumption Budget resource exists. There are no spending alerts or notifications configured on this subscription.</p>
+      <h4>Why it matters</h4>
+      <p>Without budget alerts, cost overruns go undetected until the monthly bill arrives. For startups with limited runway, an unexpected spike in Azure spending can have significant business impact.</p>
+      <h4>Recommendation</h4>
+      <p>Create a monthly budget with alert thresholds at 50%, 80%, and 100% of expected spend, plus a 100% forecasted alert. Configure email notifications to engineering and finance leads.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets" target="_blank">📘 Create and manage Azure budgets</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/cost-management-billing/understand/analyze-unexpected-charges" target="_blank">📘 Analyze unexpected Azure charges</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/cost-management-billing/costs/cost-mgt-alerts-monitor-usage-spending" target="_blank">📘 Cost alerts for monitoring usage and spending</a>
+    </div>
+  </div>
+
+  <!-- REL-001 High -->
+  <div class="finding" data-severity="high" data-pillar="reliability">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge high">High</span>
+      <div>
+        <div class="finding-title">REL-001 — Azure SQL not zone-redundant</div>
+        <div class="finding-resource">sql-contoso-prod/db-main · rg-contoso-data-prod</div>
+      </div>
+      <span class="pillar-tag">🔄 Reliability</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>SQL Database <code>db-main</code> is deployed without zone redundancy (<code>zoneRedundant: false</code>). A single availability zone failure could cause database downtime.</p>
+      <h4>Why it matters</h4>
+      <p>Zone-redundant deployments replicate data synchronously across availability zones, protecting against datacenter-level failures. Available at no extra cost on General Purpose vCore tier.</p>
+      <h4>Recommendation</h4>
+      <p>Enable zone redundancy on the production SQL Database. Verify the SKU supports it (General Purpose vCore or Business Critical in supported regions).</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-sql/database/high-availability-sla" target="_blank">📘 High availability for Azure SQL Database</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/reliability/reliability-sql-database" target="_blank">📘 Reliability in Azure SQL Database</a>
+    </div>
+  </div>
+
+  <!-- GOV-001 High -->
+  <div class="finding" data-severity="high" data-pillar="governance">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge high">High</span>
+      <div>
+        <div class="finding-title">GOV-001 — No Azure Policy assignments</div>
+        <div class="finding-resource">Subscription scope · contoso-prod</div>
+      </div>
+      <span class="pillar-tag">🏛️ Governance</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>No Azure Policy assignments exist on this subscription. There are no governance controls, compliance baselines, or tag enforcement policies in place.</p>
+      <h4>Why it matters</h4>
+      <p>Without policies, resources can be deployed in any region, without required tags, without diagnostic settings, and without security baseline compliance. This makes cost tracking and compliance auditing extremely difficult.</p>
+      <h4>Recommendation</h4>
+      <p>Deploy the baseline policy set: Microsoft Cloud Security Benchmark (Audit), allowed locations (Deny), required tags (Deny), tag inheritance (Modify), and Activity Log diagnostics (DeployIfNotExists).</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/governance/policy/overview" target="_blank">📘 Azure Policy overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/governance/policy/concepts/recommended-policies" target="_blank">📘 Recommended policies for Azure services</a>
+      <a class="doc-link" href="https://learn.microsoft.com/security/benchmark/azure/overview" target="_blank">📘 Microsoft Cloud Security Benchmark</a>
+    </div>
+  </div>
+
+  <!-- REL-002 Medium -->
+  <div class="finding" data-severity="medium" data-pillar="reliability">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge medium">Medium</span>
+      <div>
+        <div class="finding-title">REL-002 — Storage account using LRS (locally redundant)</div>
+        <div class="finding-resource">stcontosoprod · rg-contoso-data-prod</div>
+      </div>
+      <span class="pillar-tag">🔄 Reliability</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Storage account <code>stcontosoprod</code> uses LRS with data replicated only within a single datacenter.</p>
+      <h4>Why it matters</h4>
+      <p>LRS provides 11 nines of durability but only within one datacenter. A datacenter failure could result in data loss. ZRS or GRS provides significantly better durability guarantees for production data.</p>
+      <h4>Recommendation</h4>
+      <p>Upgrade to ZRS (zone-redundant) for availability zone protection, or GRS (geo-redundant) for cross-region durability of critical data.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/storage/common/storage-redundancy" target="_blank">📘 Azure Storage redundancy</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/storage/common/storage-redundancy#zone-redundant-storage" target="_blank">📘 Zone-redundant storage (ZRS)</a>
+    </div>
+  </div>
+
+  <!-- GOV-002 Medium -->
+  <div class="finding" data-severity="medium" data-pillar="governance">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge medium">Medium</span>
+      <div>
+        <div class="finding-title">GOV-002 — No management group structure</div>
+        <div class="finding-resource">Tenant scope</div>
+      </div>
+      <span class="pillar-tag">🏛️ Governance</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Subscriptions sit directly under the Tenant Root Group with no custom management group hierarchy. Policies and RBAC must be managed per-subscription.</p>
+      <h4>Why it matters</h4>
+      <p>For 1-2 subscriptions this is acceptable. As you scale beyond 3 subscriptions, per-subscription management becomes error-prone and inconsistent.</p>
+      <h4>Recommendation</h4>
+      <p>Create a single management group and place both subscriptions under it. This enables centralized policy and RBAC inheritance.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/governance/management-groups/overview" target="_blank">📘 Management groups overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/design-area/resource-org-management-groups" target="_blank">📘 CAF: Management group design</a>
+    </div>
+  </div>
+
+  <!-- OPS-002 Medium -->
+  <div class="finding" data-severity="medium" data-pillar="operations">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge medium">Medium</span>
+      <div>
+        <div class="finding-title">OPS-002 — No alert rules configured</div>
+        <div class="finding-resource">Subscription scope · contoso-prod</div>
+      </div>
+      <span class="pillar-tag">⚙️ Operations</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>No Azure Monitor alert rules exist. Critical events like break-glass sign-ins, Owner role assignments, or resource group deletions generate no notifications.</p>
+      <h4>Why it matters</h4>
+      <p>Without alerting, security incidents and operational issues go undetected until someone manually notices. Even basic alerts provide a critical early warning system.</p>
+      <h4>Recommendation</h4>
+      <p>Configure alert rules for: break-glass account sign-ins (Sev 0), Owner role additions (Sev 1), prod resource group deletions (Sev 1). Create an Action Group with email and Teams webhook notifications.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-monitor/alerts/alerts-overview" target="_blank">📘 Azure Monitor alerts overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-monitor/alerts/alerts-activity-log" target="_blank">📘 Activity log alerts</a>
+    </div>
+  </div>
+
+  <!-- SEC-005 Medium -->
+  <div class="finding" data-severity="medium" data-pillar="security">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge medium">Medium</span>
+      <div>
+        <div class="finding-title">SEC-005 — Key Vault not using RBAC authorization</div>
+        <div class="finding-resource">kv-contoso-prod · rg-contoso-shared-prod</div>
+      </div>
+      <span class="pillar-tag">🛡️ Security</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Key Vault <code>kv-contoso-prod</code> uses access policies instead of Azure RBAC for authorization. Access policies are harder to audit and don't integrate with Entra ID Conditional Access or PIM.</p>
+      <h4>Recommendation</h4>
+      <p>Switch Key Vault to RBAC authorization model and use built-in roles (Key Vault Secrets User, Key Vault Crypto Officer, etc.) for fine-grained access control.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/key-vault/general/rbac-guide" target="_blank">📘 Azure RBAC for Key Vault</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/key-vault/general/rbac-migration" target="_blank">📘 Migrate from access policies to RBAC</a>
+    </div>
+  </div>
+
+  <!-- REL-003 Medium -->
+  <div class="finding" data-severity="medium" data-pillar="reliability">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge medium">Medium</span>
+      <div>
+        <div class="finding-title">REL-003 — No backup policy on Azure SQL Database</div>
+        <div class="finding-resource">sql-contoso-prod/db-main · rg-contoso-data-prod</div>
+      </div>
+      <span class="pillar-tag">🔄 Reliability</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>Azure SQL Database <code>db-main</code> uses default short-term backup retention (7 days) with no long-term retention (LTR) policy configured.</p>
+      <h4>Recommendation</h4>
+      <p>Configure short-term backup retention to 14-35 days and set up a long-term retention policy (weekly for 4 weeks, monthly for 12 months) for compliance and disaster recovery.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-sql/database/long-term-retention-overview" target="_blank">📘 Long-term backup retention for SQL Database</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/azure-sql/database/automated-backups-overview" target="_blank">📘 Automated backups in Azure SQL</a>
+    </div>
+  </div>
+
+  <!-- COST-002 Medium -->
+  <div class="finding" data-severity="medium" data-pillar="cost">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge medium">Medium</span>
+      <div>
+        <div class="finding-title">COST-002 — Resources missing cost allocation tags</div>
+        <div class="finding-resource">14 resource groups without environment/team tags</div>
+      </div>
+      <span class="pillar-tag">💰 Cost</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>14 out of 18 resource groups are missing <code>environment</code> and/or <code>team</code> tags. Without tags, costs cannot be accurately allocated to teams or environments in Cost Analysis.</p>
+      <h4>Recommendation</h4>
+      <p>Tag all resource groups with <code>environment</code> (prod/nonprod) and <code>team</code> (owning team). Deploy Azure Policy to enforce required tags and auto-inherit them to child resources.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-tagging" target="_blank">📘 CAF: Tagging strategy</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/cost-management-billing/costs/enable-tag-inheritance" target="_blank">📘 Enable tag inheritance in Cost Management</a>
+    </div>
+  </div>
+
+  <!-- COST-003 Low -->
+  <div class="finding" data-severity="low" data-pillar="cost">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge low">Low</span>
+      <div>
+        <div class="finding-title">COST-003 — 3 unattached managed disks detected</div>
+        <div class="finding-resource">disk-old-vm-* · rg-contoso-compute-prod</div>
+      </div>
+      <span class="pillar-tag">💰 Cost</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>3 Premium SSD managed disks (128 GB each) are not attached to any VM. Combined estimated waste: ~$56/month.</p>
+      <h4>Recommendation</h4>
+      <p>Review and delete if no longer needed, or create snapshots and delete the disks to retain data without ongoing cost.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/virtual-machines/disks-find-unattached-portal" target="_blank">📘 Find and delete unattached managed disks</a>
+    </div>
+  </div>
+
+  <!-- PERF-001 Low -->
+  <div class="finding" data-severity="low" data-pillar="performance">
+    <div class="finding-header" onclick="toggleFinding(this)">
+      <span class="severity-badge low">Low</span>
+      <div>
+        <div class="finding-title">PERF-001 — App Service using Basic tier in production</div>
+        <div class="finding-resource">app-contoso-api · rg-contoso-app-prod</div>
+      </div>
+      <span class="pillar-tag">⚡ Performance</span>
+      <span class="chevron">›</span>
+    </div>
+    <div class="finding-body">
+      <h4>What was found</h4>
+      <p>App Service <code>app-contoso-api</code> runs on the Basic (B1) tier. Basic tier lacks autoscaling, deployment slots, and VNet integration — features typically needed for production workloads.</p>
+      <h4>Recommendation</h4>
+      <p>Consider upgrading to Standard (S1) or Premium (P1v3) tier for autoscaling, staging slots, and VNet integration capabilities.</p>
+      <h4>Learn more</h4>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/app-service/overview-hosting-plans" target="_blank">📘 App Service plan overview</a>
+      <a class="doc-link" href="https://learn.microsoft.com/azure/app-service/manage-scale-up" target="_blank">📘 Scale up an App Service plan</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <p>Generated by <strong>Azure Environment Advisor</strong> · <a href="https://github.com/ricmmartins/azure-environment-advisor">GitHub</a></p>
+  <p>Assessment based on <a href="https://learn.microsoft.com/azure/well-architected/">Azure Well-Architected Framework</a> · <a href="https://learn.microsoft.com/azure/cloud-adoption-framework/">Cloud Adoption Framework</a> · <a href="https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/">Azure Landing Zones</a> · <a href="https://startupscalelanding.zone">Startup-Scale Landing Zone</a></p>
+  <p style="margin-top: 0.5rem;">💡 This is a point-in-time assessment. Re-run periodically as your environment evolves.</p>
+</div>
+
+<script>
+function toggleFinding(header) { header.closest('.finding').classList.toggle('open'); }
+function filterFindings(severity, btn) {
+  btn.parentElement.querySelectorAll('.filter-btn').forEach((b, i) => { if (i < 5) b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.finding').forEach(f => {
+    const pillarMatch = !activePillar || activePillar === 'all' || f.dataset.pillar === activePillar;
+    const sevMatch = severity === 'all' || f.dataset.severity === severity;
+    f.style.display = (sevMatch && pillarMatch) ? 'block' : 'none';
+  });
+  activeSeverity = severity;
+}
+function filterPillar(pillar, btn) {
+  btn.parentElement.querySelectorAll('.filter-btn').forEach((b, i) => { if (i >= 5) b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.finding').forEach(f => {
+    const sevMatch = !activeSeverity || activeSeverity === 'all' || f.dataset.severity === activeSeverity;
+    const pillarMatch = pillar === 'all' || f.dataset.pillar === pillar;
+    f.style.display = (sevMatch && pillarMatch) ? 'block' : 'none';
+  });
+  activePillar = pillar;
+}
+let activeSeverity = 'all', activePillar = 'all';
+</script>
+
+</body>
+</html>
