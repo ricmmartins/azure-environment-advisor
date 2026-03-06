@@ -338,38 +338,40 @@ azure-environment-advisor/
 ### 1. Prerequisites
 
 - [GitHub Copilot](https://github.com/features/copilot) subscription (Individual, Business, or Enterprise)
-- [Azure MCP Server](https://github.com/Azure/azure-mcp-server) installed and configured
-- Azure subscription with **Reader** role (no write access needed)
-- Azure CLI authenticated (`az login`)
+- [Node.js](https://nodejs.org/) (v18 or later) — required to run the Azure MCP Server
+- An Azure subscription you want to assess
 
-### 2. Install Azure MCP Server
+### 2. Install Azure CLI
+
+The Azure MCP Server authenticates using your Azure CLI credentials. Install it for your platform:
+
+- **Windows:** `winget install -e --id Microsoft.AzureCLI`
+- **macOS:** `brew install azure-cli`
+- **Linux:** [Install Azure CLI on Linux](https://learn.microsoft.com/cli/azure/install-azure-cli-linux)
+
+Verify the installation, log in, and confirm your target subscription:
 
 ```bash
-# Install via npm
+az --version
+az login
+az account show --query "{Name:name, Id:id, State:state}" -o table
+```
+
+> **Permissions:** You need at least **Reader** role on the subscription. No write access is needed — the agent only reads your environment. If you're unsure about your permissions, ask your Azure administrator to assign the [Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#reader) built-in role to your account on the target subscription.
+
+### 3. Install Azure MCP Server
+
+```bash
 npm install -g @azure/mcp-server
 ```
 
-### 3. Configure MCP Server
+> **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions.
 
-Add the Azure MCP Server to your MCP configuration.
+### 4. Configure MCP Server
 
-**For VS Code** (`.vscode/mcp.json` in this repo or your user settings):
+Add the Azure MCP Server to your MCP configuration. Replace `<your-subscription-id>` with the subscription ID from step 2.
 
-```json
-{
-  "servers": {
-    "azure": {
-      "command": "npx",
-      "args": ["-y", "@azure/mcp-server"],
-      "env": {
-        "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
-      }
-    }
-  }
-}
-```
-
-**For GitHub Copilot CLI** (`~/.config/github-copilot/mcp.json`):
+**For VS Code** — create `.vscode/mcp.json` in this repo (or add to your user settings):
 
 ```json
 {
@@ -385,39 +387,60 @@ Add the Azure MCP Server to your MCP configuration.
 }
 ```
 
-> **Authentication:** The Azure MCP Server uses your Azure CLI credentials. Run `az login` before starting.
+**For GitHub Copilot CLI:**
 
-### 4. Clone This Repository
+- **macOS / Linux:** `~/.config/github-copilot/mcp.json`
+- **Windows:** `%APPDATA%\github-copilot\mcp.json`
+
+Create the directory and file if they don't exist, then add:
+
+```json
+{
+  "servers": {
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp-server"],
+      "env": {
+        "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
+      }
+    }
+  }
+}
+```
+
+### 5. Clone This Repository
 
 ```bash
 git clone https://github.com/ricmmartins/azure-environment-advisor.git
 cd azure-environment-advisor
 ```
 
-### 5. Run the Assessment
+### 6. Run the Assessment
 
 Open the project in your Copilot-enabled environment, then ask:
 
 **In VS Code (Copilot Chat — Agent mode):**
 ```
-Assess my Azure subscription
+@workspace Assess my Azure subscription
 ```
 
-**In GitHub Copilot CLI:**
-```
-Assess my Azure subscription abc-12345-def-67890
+**In GitHub Copilot CLI (from the project directory):**
+```bash
+gh copilot "Assess my Azure subscription using the rules in this project"
 ```
 
 The agent will:
-1. Connect to your subscription via Azure MCP Server
-2. Run the Resource Graph queries from `queries/`
+1. Connect to your subscription via Azure MCP Server (~30 seconds)
+2. Run the Resource Graph queries from `queries/` (~1 minute)
 3. Profile your environment (startup / scale-up / enterprise)
-4. Evaluate against all rules in `rules/`
+4. Evaluate against all rules in `rules/` (~2–5 minutes)
 5. Generate a self-contained HTML dashboard
 
-### 6. View the Report
+**Expected duration:** 3–5 minutes for small subscriptions (< 50 resources), 5–10 minutes for medium (50–500), 10–15 minutes for large (500+).
 
-The agent generates a single HTML file (e.g., `assessment-contoso-prod-2026-03-06.html`). Open it in any browser — no server required. You can also share it via email or attach it to a compliance review.
+### 7. View the Report
+
+The agent generates a single HTML file (e.g., `assessment-contoso-prod-2025-01-15.html`). Open it in any browser — no server required. You can share it via email, print to PDF, or attach it to a compliance review.
 
 ### Customization
 
@@ -426,6 +449,22 @@ The agent generates a single HTML file (e.g., `assessment-contoso-prod-2026-03-0
 **Adjust severity for your context:** Edit the profile files in `profiles/` to change how severity is calibrated for your company stage.
 
 **Modify queries:** Add or edit `.kql` files in `queries/resource-graph/` to expand what the agent discovers.
+
+## Glossary
+
+| Term | Definition |
+|------|-----------|
+| **WAF** | [Well-Architected Framework](https://learn.microsoft.com/azure/well-architected/) — Microsoft's 5-pillar framework for building reliable, secure, efficient, cost-optimized, and operationally excellent workloads |
+| **CAF** | [Cloud Adoption Framework](https://learn.microsoft.com/azure/cloud-adoption-framework/) — Microsoft's guidance for cloud adoption strategy, planning, and governance |
+| **ALZ** | [Azure Landing Zone](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/) — A target architecture for enterprise Azure environments with management groups, networking, and governance |
+| **SSLZ** | [Startup Scale Landing Zone](https://startupscalelanding.zone) — A lightweight landing zone pattern designed for startups |
+| **MCP** | [Model Context Protocol](https://modelcontextprotocol.io/) — An open protocol that allows AI agents to connect to external tools and data sources |
+| **NSG** | Network Security Group — Azure's network-level firewall for controlling traffic to/from subnets and VMs |
+| **RBAC** | Role-Based Access Control — Azure's authorization system for managing who can do what on which resources |
+| **PIM** | Privileged Identity Management — Entra ID feature for just-in-time privileged access |
+| **CSPM** | Cloud Security Posture Management — Defender for Cloud's free tier for security recommendations |
+| **MFA** | Multi-Factor Authentication — Requiring two or more verification methods for sign-in |
+| **KQL** | Kusto Query Language — The query language used by Azure Resource Graph and Log Analytics |
 
 ## Future Possibilities
 

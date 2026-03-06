@@ -66,6 +66,46 @@ Enterprise-grade governance findings are downgraded for startups. Focus on what 
 | SEC-030 | No Key Vault deployed | High | High | Start right with secrets management |
 | SEC-031 | Key Vault using access policies instead of RBAC | Medium | Low | Access policies are fine initially |
 | SEC-032 | Managed identities not used | Medium | Low | Adopt when comfortable with the pattern |
+| **Cost** | | | | |
+| COST-001 | No budget alerts configured | High | High | Budgets matter; surprises kill startups |
+| COST-002 | No cost anomaly detection | Medium | Low | Nice to have but not critical yet |
+| COST-010 | Unattached managed disks | Low/Medium | Low | Clean up when possible |
+| COST-011 | Orphaned public IP addresses | Low | Low | Minor cost; clean up opportunistically |
+| COST-012 | Idle Network Interfaces | Low | Low | Minor cost; clean up opportunistically |
+| COST-013 | Empty resource groups | Low | Informational | No cost impact; just clutter |
+| COST-020 | Over-provisioned VMs | Medium | Medium | Right-size to save money |
+| COST-021 | Dev/test resources using production SKUs | Medium | Medium | Easy savings opportunity |
+| COST-030 | No reserved instances for steady-state workloads | Medium | Low | Too early to commit to reservations |
+| COST-031 | No savings plan coverage | Low | Informational | Not cost-effective at small scale |
+| **Operations** | | | | |
+| OPS-001 | No diagnostic settings configured | Critical | High | Basic monitoring is enough; full diagnostics overkill |
+| OPS-002 | No Log Analytics workspace | Critical | High | Centralized logging important but not critical yet |
+| OPS-003 | Resources missing diagnostic settings | Medium | Low | Enable for critical resources only |
+| OPS-010 | No Azure Policy assignments | High | Low | Policy isn't critical yet |
+| OPS-011 | No tagging strategy | Medium | Medium | Basic tags help even small teams |
+| OPS-012 | Non-compliant policy resources | High | Low | Depends on having policies first |
+| OPS-020 | No evidence of IaC usage | Medium | Low | Encouraged but not required |
+| OPS-021 | No CI/CD deployment pattern | Medium | Low | Manual deployments acceptable initially |
+| OPS-030 | No alert rules configured | High | Medium | Basic alerting prevents surprises |
+| OPS-031 | No action groups configured | High | Medium | Need someone to receive alerts |
+| OPS-032 | No Service Health alerts | Medium | Low | Nice to have; check portal manually |
+| **Performance** | | | | |
+| PERF-001 | App Service using Basic tier in production | Low/Medium | Low | Basic tier acceptable for low-traffic apps |
+| PERF-002 | VM using previous generation size | Low | Informational | Cost difference is minimal |
+| PERF-003 | AKS using default node pool only | Medium | Low | Most startups don't need AKS complexity |
+| PERF-010 | No caching layer detected | Low/Medium | Informational | Caching is premature at this stage |
+| PERF-011 | CDN not configured for static assets | Low | Informational | Optimize when traffic warrants it |
+| PERF-020 | SQL Database using DTU model | Low/Medium | Low | DTU is simpler for small workloads |
+| PERF-021 | SQL Database on lowest tier | Low | Informational | Lowest tier is fine for dev/staging |
+| PERF-022 | Cosmos DB using provisioned throughput without autoscale | Medium | Low | Manual throughput acceptable at small scale |
+| **Governance** | | | | |
+| GOV-001 | No landing zone structure detected | High | Informational | No landing zone expected at this stage |
+| GOV-002 | Landing zone maturity gap | Medium | Informational | Not applicable yet |
+| GOV-010 | All workloads in single subscription | Medium/High | Pass | Single subscription is fine |
+| GOV-011 | No prod/non-prod separation | High | Low | Can use tags instead of subscription separation |
+| GOV-012 | Inconsistent naming convention | Medium | Low | Consistency matters more than convention |
+| GOV-020 | No management group hierarchy | Medium/High | Pass | Not needed yet |
+| GOV-021 | Policies not assigned at management group level | Medium | Pass | No management groups to assign to |
 
 ## Recommended Landing Zone
 

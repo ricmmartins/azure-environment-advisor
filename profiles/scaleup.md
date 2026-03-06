@@ -68,6 +68,46 @@ Most rules apply at standard severity. Governance and operational maturity becom
 | SEC-030 | No Key Vault deployed | High | High | Standard requirement |
 | SEC-031 | Key Vault using access policies instead of RBAC | Medium | Medium | Plan migration to RBAC model |
 | SEC-032 | Managed identities not used | Medium | High | Should be the default for service auth |
+| **Cost** | | | | |
+| COST-001 | No budget alerts configured | High | High | Budget governance expected |
+| COST-002 | No cost anomaly detection | Medium | Medium | Growing spend needs monitoring |
+| COST-010 | Unattached managed disks | Low/Medium | Medium | Waste adds up at scale |
+| COST-011 | Orphaned public IP addresses | Low | Low | Clean up in hygiene cycles |
+| COST-012 | Idle Network Interfaces | Low | Low | Clean up in hygiene cycles |
+| COST-013 | Empty resource groups | Low | Low | Keep environment tidy |
+| COST-020 | Over-provisioned VMs | Medium | Medium | Right-sizing saves real money |
+| COST-021 | Dev/test resources using production SKUs | Medium | High | Significant cost impact at scale |
+| COST-030 | No reserved instances for steady-state workloads | Medium | Medium | Evaluate for stable workloads |
+| COST-031 | No savings plan coverage | Low | Low | Consider as spend grows |
+| **Operations** | | | | |
+| OPS-001 | No diagnostic settings configured | Critical | Critical | Monitoring is critical at scale |
+| OPS-002 | No Log Analytics workspace | Critical | Critical | Centralized logging required |
+| OPS-003 | Resources missing diagnostic settings | Medium | High | All production resources need diagnostics |
+| OPS-010 | No Azure Policy assignments | High | High | Policies expected at this stage |
+| OPS-011 | No tagging strategy | Medium | High | Tags essential for cost allocation and ops |
+| OPS-012 | Non-compliant policy resources | High | High | Compliance matters with growing team |
+| OPS-020 | No evidence of IaC usage | Medium | Medium | IaC adoption should be in progress |
+| OPS-021 | No CI/CD deployment pattern | Medium | Medium | Formalizing deployments expected |
+| OPS-030 | No alert rules configured | High | High | Proactive alerting required |
+| OPS-031 | No action groups configured | High | High | Alert routing must be defined |
+| OPS-032 | No Service Health alerts | Medium | Medium | Stay informed of platform issues |
+| **Performance** | | | | |
+| PERF-001 | App Service using Basic tier in production | Low/Medium | Medium | Production needs Standard+ tier |
+| PERF-002 | VM using previous generation size | Low | Low | Update during next maintenance window |
+| PERF-003 | AKS using default node pool only | Medium | Medium | Separate system and user pools |
+| PERF-010 | No caching layer detected | Low/Medium | Medium | Consider caching for frequently accessed data |
+| PERF-011 | CDN not configured for static assets | Low | Low | Implement for user-facing apps |
+| PERF-020 | SQL Database using DTU model | Low/Medium | Medium | Evaluate vCore for predictable performance |
+| PERF-021 | SQL Database on lowest tier | Low | Medium | Production should not be on lowest tier |
+| PERF-022 | Cosmos DB using provisioned throughput without autoscale | Medium | Medium | Autoscale prevents throttling |
+| **Governance** | | | | |
+| GOV-001 | No landing zone structure detected | High | High | Need landing zone structure |
+| GOV-002 | Landing zone maturity gap | Medium | Medium | Address maturity gaps |
+| GOV-010 | All workloads in single subscription | Medium/High | High | Must begin subscription separation |
+| GOV-011 | No prod/non-prod separation | High | High | Must separate prod/non-prod |
+| GOV-012 | Inconsistent naming convention | Medium | Medium | Enforce naming standards |
+| GOV-020 | No management group hierarchy | Medium/High | Medium | Starting management group hierarchy |
+| GOV-021 | Policies not assigned at management group level | Medium | Medium | Assign policies at MG level as hierarchy forms |
 
 ## Recommended Landing Zone
 

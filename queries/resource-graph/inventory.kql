@@ -1,7 +1,7 @@
 // Resource count by type, location, and resource group
 resources
-| summarize count() by type, location, resourceGroup
-| order by count_ desc
+| summarize ResourceCount=count() by type, location, resourceGroup
+| order by ResourceCount desc
 
 // Resource types summary
 resources

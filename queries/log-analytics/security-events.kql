@@ -16,5 +16,5 @@ AzureDiagnostics
 | where ResourceProvider == "MICROSOFT.KEYVAULT"
 | where TimeGenerated > ago(7d)
 | where OperationName in ("SecretGet", "SecretSet", "SecretDelete", "KeyGet", "KeyCreate", "KeyDelete")
-| summarize count() by OperationName, CallerIPAddress, identity_claim_upn_s
-| order by count_ desc
+| summarize OperationCount=count() by OperationName, CallerIPAddress, identity_claim_upn_s
+| order by OperationCount desc
