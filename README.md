@@ -335,13 +335,26 @@ azure-environment-advisor/
 
 ## Getting Started
 
+### How It Works (Key Concepts)
+
+Before you begin, here's what each piece does:
+
+- **GitHub Copilot** is an AI assistant built into VS Code (and the GitHub CLI). You type a request in plain English, and it executes multi-step tasks for you. In **Agent mode**, Copilot can use external tools — like the Azure MCP Server — to read data and act on it.
+- **MCP (Model Context Protocol)** is an open standard that lets AI assistants connect to external systems. Think of it as a "plugin" that gives Copilot the ability to read your Azure subscription.
+- **Azure MCP Server** is the specific MCP plugin for Azure. It gives Copilot **read-only** access to your subscription's resources, configurations, and policies — it cannot modify anything.
+- **This repository** contains the assessment rules, queries, and report template. When you ask Copilot to "assess my Azure subscription," it reads these files, connects to Azure via MCP, and generates an HTML report.
+
 ### 1. Prerequisites
 
-- [GitHub Copilot](https://github.com/features/copilot) subscription (Individual, Business, or Enterprise)
-- [Node.js](https://nodejs.org/) (v18 or later) — required to run the Azure MCP Server
-- An Azure subscription you want to assess
+| Requirement | What it is | Install link |
+|---|---|---|
+| **Azure subscription** | The Azure environment you want to assess. If you don't have one, [create a free Azure account](https://azure.microsoft.com/free/) (no credit card required for 30 days). | [azure.microsoft.com/free](https://azure.microsoft.com/free/) |
+| **GitHub Copilot** | AI assistant subscription (Individual, Business, or Enterprise). Needed to run the agent. | [github.com/features/copilot](https://github.com/features/copilot) |
+| **VS Code** | The recommended editor. Install the **GitHub Copilot** and **GitHub Copilot Chat** extensions from the Extensions marketplace (`Ctrl+Shift+X` → search "GitHub Copilot"). | [code.visualstudio.com](https://code.visualstudio.com/) |
+| **Node.js** (v18+) | Required to run the Azure MCP Server. | [nodejs.org](https://nodejs.org/) |
+| **Git** | To clone this repository. | [git-scm.com](https://git-scm.com/) |
 
-### 2. Install Azure CLI
+### 2. Install Azure CLI and Log In
 
 The Azure MCP Server authenticates using your Azure CLI credentials. Install it for your platform:
 
@@ -349,15 +362,30 @@ The Azure MCP Server authenticates using your Azure CLI credentials. Install it 
 - **macOS:** `brew install azure-cli`
 - **Linux:** [Install Azure CLI on Linux](https://learn.microsoft.com/cli/azure/install-azure-cli-linux)
 
-Verify the installation, log in, and confirm your target subscription:
+Then log in and verify access:
 
 ```bash
+# Verify Azure CLI installed correctly (should print version number)
 az --version
+
+# Log in — this opens a browser window. Sign in with your Azure account, then return to the terminal.
 az login
+
+# List your subscriptions (pick the one you want to assess)
+az account list --query "[].{Name:name, Id:id, State:state}" -o table
+
+# Set your target subscription (replace with the Name or ID from above)
+az account set --subscription "My Subscription Name"
+
+# Confirm it's active
 az account show --query "{Name:name, Id:id, State:state}" -o table
 ```
 
-> **Permissions:** You need at least **Reader** role on the subscription. No write access is needed — the agent only reads your environment. If you're unsure about your permissions, ask your Azure administrator to assign the [Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#reader) built-in role to your account on the target subscription.
+> **Permissions:** You need at least **Reader** role on the subscription. No write access is needed — the agent only reads your environment. To check your role:
+> ```bash
+> az role assignment list --assignee $(az ad signed-in-user show --query id -o tsv) --query "[].{Role:roleDefinitionName, Scope:scope}" -o table
+> ```
+> If you don't see "Reader" (or a higher role like "Contributor" / "Owner"), ask your Azure administrator to assign the [Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#reader) built-in role to your account on the target subscription. Role assignments can take up to 5 minutes to take effect.
 
 ### 3. Install Azure MCP Server
 
@@ -365,13 +393,27 @@ az account show --query "{Name:name, Id:id, State:state}" -o table
 npm install -g @azure/mcp-server
 ```
 
-> **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions.
+> **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions. If the package name has changed, update the `"args"` in the MCP configuration (step 4) to match.
 
 ### 4. Configure MCP Server
 
-Add the Azure MCP Server to your MCP configuration. Replace `<your-subscription-id>` with the subscription ID from step 2.
+The MCP configuration tells Copilot where to find the Azure MCP Server and which subscription to use. Replace `<your-subscription-id>` with the subscription ID from step 2 (the `Id` column from `az account show`).
 
-**For VS Code** — create `.vscode/mcp.json` in this repo (or add to your user settings):
+**For VS Code (recommended):**
+
+Create a file called `mcp.json` inside a `.vscode` folder in this repo:
+
+```
+azure-environment-advisor/
+  .vscode/
+    mcp.json       ← create this file
+```
+
+If the `.vscode/` folder doesn't exist, create it first:
+- **Windows (PowerShell):** `mkdir .vscode`
+- **macOS / Linux:** `mkdir -p .vscode`
+
+Then create `.vscode/mcp.json` with this content:
 
 ```json
 {
@@ -387,26 +429,31 @@ Add the Azure MCP Server to your MCP configuration. Replace `<your-subscription-
 }
 ```
 
-**For GitHub Copilot CLI:**
+> **How VS Code picks this up:** VS Code automatically detects `.vscode/mcp.json` when you open the project folder. No extra settings needed — just restart VS Code after creating the file.
 
+**Alternative — For GitHub Copilot CLI (`gh copilot`):**
+
+First, install the GitHub CLI and the Copilot extension if you haven't:
+```bash
+# Install GitHub CLI: https://cli.github.com/
+gh auth login
+gh extension install github/gh-copilot
+```
+
+Then create the MCP config file at:
 - **macOS / Linux:** `~/.config/github-copilot/mcp.json`
-- **Windows:** `%APPDATA%\github-copilot\mcp.json`
+- **Windows:** `%APPDATA%\github-copilot\mcp.json` (typically `C:\Users\YourName\AppData\Roaming\github-copilot\mcp.json`)
 
-Create the directory and file if they don't exist, then add:
+Create the directory and file if they don't exist:
 
-```json
-{
-  "servers": {
-    "azure": {
-      "command": "npx",
-      "args": ["-y", "@azure/mcp-server"],
-      "env": {
-        "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
-      }
-    }
-  }
-}
+```bash
+# macOS / Linux
+mkdir -p ~/.config/github-copilot
+# Windows (PowerShell)
+New-Item -ItemType Directory -Force -Path "$env:APPDATA\github-copilot"
 ```
+
+Then add the same JSON content as above.
 
 ### 5. Clone This Repository
 
@@ -415,32 +462,68 @@ git clone https://github.com/ricmmartins/azure-environment-advisor.git
 cd azure-environment-advisor
 ```
 
+> **Important:** Open this folder in VS Code (`code .`) so that Copilot can read the rules, queries, and profiles.
+
 ### 6. Run the Assessment
 
-Open the project in your Copilot-enabled environment, then ask:
+**In VS Code (recommended):**
 
-**In VS Code (Copilot Chat — Agent mode):**
+1. Open the project folder in VS Code
+2. Open **Copilot Chat** (`Ctrl+Shift+I` on Windows/Linux, `Cmd+Shift+I` on macOS)
+3. Make sure you're in **Agent mode** — look for the mode selector at the top of the chat panel. If it says "Ask" or "Edit", click it and switch to **"Agent"**
+4. Type your request:
+
 ```
-@workspace Assess my Azure subscription
+Assess my Azure subscription
 ```
 
-**In GitHub Copilot CLI (from the project directory):**
+Copilot will read the `.github/copilot-instructions.md` file, connect to Azure via the MCP Server, and start the 5-phase assessment.
+
+**Alternative — In GitHub Copilot CLI:**
+
+From the project directory:
 ```bash
 gh copilot "Assess my Azure subscription using the rules in this project"
 ```
 
-The agent will:
-1. Connect to your subscription via Azure MCP Server (~30 seconds)
-2. Run the Resource Graph queries from `queries/` (~1 minute)
-3. Profile your environment (startup / scale-up / enterprise)
-4. Evaluate against all rules in `rules/` (~2–5 minutes)
-5. Generate a self-contained HTML dashboard
+**What to expect:**
+
+The agent will show its progress as it works:
+1. ✅ Connect to your subscription via Azure MCP Server (~30 seconds)
+2. 📊 Run the Resource Graph queries from `queries/` (~1 minute)
+3. 🏢 Profile your environment (startup / scale-up / enterprise)
+4. 🔍 Evaluate against all rules in `rules/` (~2–5 minutes)
+5. 📄 Generate a self-contained HTML dashboard
 
 **Expected duration:** 3–5 minutes for small subscriptions (< 50 resources), 5–10 minutes for medium (50–500), 10–15 minutes for large (500+).
 
 ### 7. View the Report
 
-The agent generates a single HTML file (e.g., `assessment-contoso-prod-2025-01-15.html`). Open it in any browser — no server required. You can share it via email, print to PDF, or attach it to a compliance review.
+When the assessment finishes, Copilot creates a single HTML file in the project folder, e.g.:
+
+```
+azure-environment-advisor/
+  assessment-contoso-prod-2025-01-15.html    ← your report
+```
+
+Open it in any browser (double-click the file, or right-click → "Open with" → your browser). No server required. You can:
+- **Share it** via email or Slack (it's a single self-contained file)
+- **Print to PDF** using your browser's print function (`Ctrl+P`)
+- **Attach it** to a compliance review or architecture decision record
+
+> **What the report looks like:** Open `samples/sample-report.html` in your browser to see an example. Your report will have the same layout with findings specific to your subscription.
+
+### Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `az login` opens a browser but nothing happens | Make sure you're signing in with the Azure account that has access to the target subscription. After signing in, return to the terminal — it should show "You have logged in." |
+| `az account list` shows no subscriptions | Your account may not have any subscriptions. Check with your Azure administrator, or [create a free account](https://azure.microsoft.com/free/). |
+| `npm install -g @azure/mcp-server` fails | Make sure Node.js v18+ is installed (`node --version`). On macOS/Linux you may need `sudo`. |
+| Copilot doesn't seem to connect to Azure | Verify the MCP config: check that `.vscode/mcp.json` exists, the subscription ID is correct, and you've restarted VS Code. Try `az account show` to confirm you're logged in. |
+| Copilot says "I can't access Azure" or times out | Run `az login` again — your token may have expired. Also verify `AZURE_SUBSCRIPTION_ID` in your MCP config matches the subscription from `az account show`. |
+| The report is missing findings or seems incomplete | Large subscriptions may hit Copilot's context limits. Try assessing one resource group at a time: "Assess the resources in resource group rg-production". |
+| "Agent mode" not available in VS Code | Make sure the **GitHub Copilot Chat** extension is installed and you have a Copilot subscription. Update VS Code to the latest version. Agent mode requires VS Code 1.99+. |
 
 ### Customization
 

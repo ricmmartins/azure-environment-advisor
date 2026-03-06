@@ -188,7 +188,11 @@ Use the sample report at `samples/sample-report.html` as the **exact template** 
 - One card per pillar (Security, Reliability, Cost, Operations, Performance, Governance)
 - SVG circular progress indicator showing the percentage score
 - Pillar icon, name, and finding count breakdown
-- Color the score based on level: 0-40% critical red, 41-60% high orange, 61-75% medium yellow, 76-100% pass green
+- Color the score based on level:
+  - 0–40%: critical red (`#d13438`)
+  - 41–60%: high orange (`#e97548`)
+  - 61–75%: medium yellow (`#eaa300`)
+  - 76–100%: pass green (`#107c10`)
 
 #### Filter Bar
 - Severity filter buttons: All, Critical, High, Medium, Low
@@ -205,7 +209,7 @@ Use the sample report at `samples/sample-report.html` as the **exact template** 
   - **Why it matters** — risk/impact explanation (omit for Low severity if obvious)
   - **Recommendation** — specific, actionable steps
   - **Learn More** — Microsoft Learn links as styled buttons with 📘 icon
-- First critical finding should be expanded by default (has class `open`)
+- First critical finding should be expanded by default (has class `open`). If there are no Critical findings, expand the first High finding instead. If no High findings either, expand the first finding regardless of severity.
 - Sort findings: Critical first, then High, Medium, Low
 
 #### Passed Checks (Optional)
@@ -305,3 +309,34 @@ Query `authorizationresources` table for RBAC role assignments and role definiti
 - Always state the detected profile in the report header
 - Adjust severity per the profile definitions in `profiles/`
 - Include profile-appropriate recommendations (don't suggest PIM for a 5-person startup)
+
+### Scope
+- **Assess one subscription at a time.** If the user has multiple subscriptions, ask which one to assess and generate a separate report for each.
+- If the user asks to assess "everything" or "all subscriptions," explain that multi-subscription assessment is on the roadmap and recommend starting with the most critical subscription.
+
+### Error Handling & Edge Cases
+
+**If a query fails or times out:**
+- Note which query failed in the report's "Assessment Limitations" footer section
+- Continue with the remaining queries — don't stop the entire assessment
+- If `inventory.kql` fails (the foundational query), notify the user and suggest re-running or checking permissions
+
+**If no Log Analytics workspace exists:**
+- Skip the `queries/log-analytics/` queries entirely — they require a workspace
+- Note in the report: "Log Analytics queries skipped — no workspace found. Sign-in anomaly and security event analysis requires a configured Log Analytics workspace."
+- This does NOT affect Resource Graph queries (inventory, networking, security, compliance, RBAC)
+
+**If the subscription is empty (0 resources):**
+- Generate a minimal report stating "No resources found in this subscription"
+- Profile as "Startup" and note that the environment appears to be a new or empty subscription
+- Recommend the Startup Scale Landing Zone as a starting point
+
+**If the user lacks permissions:**
+- If queries return empty results for resources you'd expect to find, the user may have insufficient permissions
+- Suggest running `az role assignment list --assignee <user>` to check their role
+- Note permission-related limitations in the Assessment Limitations section
+
+**If a rule can't be evaluated:**
+- Some rules may require data that the Azure MCP Server doesn't expose (e.g., detailed network watcher flow logs, application-level configs)
+- Mark these as "Not Evaluated" in the Assessment Limitations section
+- Never fabricate findings — only report what you can verify from actual data
