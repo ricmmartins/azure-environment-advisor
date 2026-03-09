@@ -393,6 +393,14 @@ az account show --query "{Name:name, Id:id, State:state}" -o table
 npm install -g @azure/mcp-server
 ```
 
+Verify it installed correctly:
+
+```bash
+npx @azure/mcp-server --help
+```
+
+> If you see usage information, the server is installed. If you see an error, check that Node.js v18+ is installed (`node --version`).
+
 > **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions. If the package name has changed, update the `"args"` in the MCP configuration (step 4) to match.
 
 ### 4. Configure MCP Server

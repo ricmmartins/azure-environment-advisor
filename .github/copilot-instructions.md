@@ -75,7 +75,15 @@ Run `queries/resource-graph/rbac.kql` to review:
 - Owner/Contributor counts at subscription scope
 - Managed identity usage across resources
 
-### 2.6 Additional Discovery
+### 2.6 Log Analytics (Optional)
+If the environment has a Log Analytics workspace, run the queries from `queries/log-analytics/` for deeper insight:
+- `sign-in-anomalies.kql` — unusual sign-in patterns (risky sign-ins, unfamiliar locations)
+- `resource-changes.kql` — recent resource modifications and who made them
+- `security-events.kql` — Defender alerts, JIT access requests, Key Vault operations
+
+> **Note:** These queries require a Log Analytics workspace. If none exists, skip this step — it will be noted in the report's Assessment Limitations section.
+
+### 2.7 Additional Discovery
 Use the Azure MCP Server to also check:
 - **Diagnostic settings** — are resources sending logs to Log Analytics?
 - **Budget resources** — are consumption budgets configured?
@@ -83,6 +91,9 @@ Use the Azure MCP Server to also check:
 - **Autoscale settings** — are compute resources set to autoscale?
 - **Alert rules** — what monitoring alerts exist?
 - **Action groups** — who gets notified when alerts fire?
+
+### Data Flow
+Store all discovery results — you will use them in Phase 3 (to compute profile signals) and Phase 4 (to evaluate rules). Do not discard any query results until the assessment is complete.
 
 ---
 
@@ -112,7 +123,11 @@ Use these queries to compute profile signals from the discovery data:
 - **Resource Groups:** `resources | summarize dcount(resourceGroup)`
 - **Policy Assignments:** `policyresources | where type == 'microsoft.authorization/policyassignments' | summarize count()`
 
-**Matching rule:** If 3 or more signals match a profile's thresholds, use that profile. If ambiguous (signals split across two profiles), default to the lower maturity profile — it's better to recommend growth than to assume maturity that doesn't exist.
+**Matching rule:** Count how many of the 7 signals match each profile's thresholds, then:
+- If one profile has **3 or more** matching signals and leads the others, use that profile.
+- If two profiles are **tied** (e.g., 3–3–1), pick the **lower maturity** profile (Startup < Scale-up < Enterprise). It's better to recommend growth than to assume maturity that doesn't exist.
+- If signals are **evenly split** across all three (e.g., 2–2–2 with 1 ambiguous), default to **Scale-up** as the safe middle ground.
+- If **fewer than 3 signals** match any single profile (very unusual), default to **Startup**.
 
 Load the matching profile from `profiles/` to calibrate severity levels and recommendations. The profile affects:
 - **Severity adjustments** — some findings are Critical for enterprise but Medium for startups
@@ -133,20 +148,46 @@ Evaluate the discovered environment against every rule in `rules/`. The rules ar
 5. **Performance Efficiency** (`rules/performance/`) — Compute sizing, caching, database tiers
 6. **Governance & Landing Zone** (`rules/governance/`) — Landing zone maturity, subscription topology, management groups
 
+### Rule File Format
+
+Each rule file in `rules/` is a markdown file containing one or more rules. Each rule has this structure:
+
+```
+## RULE-ID — Rule Title
+
+- **Pillar:** Security / Reliability / Cost / etc.
+- **Severity:** Critical / High / Medium / Low (this is the default severity)
+- **Profiles:** How severity changes per profile (e.g., "Startup: Medium, Scale-up: High, Enterprise: Critical")
+
+### What to Check
+Description of what to verify, often with an embedded KQL query in a ```kusto code block.
+The KQL query shows what to look for in the discovery data.
+
+### Finding Template
+Pre-written text for "What was found", "Why it matters", and "Recommendation"
+with placeholders like {resourceName}, {count}, {subscriptionName}.
+
+### Learn More
+- [Link title](https://learn.microsoft.com/azure/...)
+```
+
 ### For each rule:
 1. Read the rule definition from the corresponding file in `rules/`
-2. Check whether the finding applies based on discovered data
-3. Adjust severity based on the environment profile
-4. If the rule triggers, create a finding with:
+2. If the rule's "What to Check" section includes a KQL query, execute it against the discovery data (or run it via MCP if not already collected)
+3. If the rule's condition is triggered (the problematic state exists), create a finding
+4. Look up the **profile-adjusted severity** from the current profile file in `profiles/` — use the severity from the profile's table, NOT the default severity in the rule file
+5. If the rule's condition is NOT triggered, count it as a **passed check**
+6. If the rule cannot be evaluated (data not available), note it as a **limitation**
+7. Populate the finding using the Finding Template, replacing placeholders with actual values:
    - **Rule ID** (e.g., SEC-001, REL-002)
    - **Title** — clear, specific description of what was found
    - **Pillar** — which WAF pillar it belongs to
-   - **Severity** — Critical, High, Medium, or Low (adjusted by profile)
+   - **Severity** — the profile-adjusted severity (Critical, High, Medium, or Low)
    - **What was found** — factual description of the current state
    - **Why it matters** — business impact and risk explanation
    - **Recommendation** — specific, actionable fix
    - **Resources affected** — resource names, resource groups
-   - **Learn More links** — direct Microsoft Learn URLs for remediation guidance
+   - **Learn More links** — Microsoft Learn URLs from the rule file
 
 ### Severity Levels
 - **Critical** — Immediate risk. Data exposure, no security baseline, no disaster recovery for critical data.
@@ -157,8 +198,10 @@ Evaluate the discovered environment against every rule in `rules/`. The rules ar
 ### Calculating Pillar Scores
 For each pillar, calculate a score (0–100%):
 - Start at 100%
-- Subtract points based on finding severity: Critical = -20, High = -12, Medium = -6, Low = -3
-- Floor at 0%
+- For each finding in that pillar, subtract points based on its **profile-adjusted** severity: Critical = -20, High = -12, Medium = -6, Low = -3
+- Floor at 0% (never go negative)
+
+> **Important:** Use the severity from the profile's severity adjustment table (e.g., `profiles/startup.md`), NOT the default severity listed in the rule file. A rule that defaults to "Critical" may be "Medium" for startups.
 
 ---
 
@@ -261,22 +304,24 @@ When generating the report:
 
 ## Azure MCP Server Tools
 
-You have access to the Azure MCP Server which provides read-only access to Azure resources. Use these capabilities:
+The Azure MCP Server exposes its tools automatically via the Model Context Protocol. You do **not** need to know specific function names — your MCP client (VS Code Copilot, GitHub CLI) discovers available tools at runtime when the server starts.
 
-### Resource Graph Queries
-Execute KQL queries against Azure Resource Graph to discover resources, configurations, and relationships. Use the queries from `queries/resource-graph/`.
+**How to use MCP tools in practice:**
+- To run a KQL query: read the `.kql` file content from this repository, then ask the Azure MCP Server to execute it against Azure Resource Graph. The server will accept the KQL string and return results as structured data.
+- To read a resource's detailed configuration: ask the Azure MCP Server for the resource by its resource ID (from Resource Graph results).
+- To query security, policy, or authorization data: use the same Resource Graph query mechanism but target the `securityresources`, `policyresources`, or `authorizationresources` tables.
 
-### Resource Details
-Read detailed configurations of individual resources when Resource Graph doesn't provide enough detail (e.g., diagnostic settings, backup policies, autoscale rules).
+### What the MCP Server Can Do
 
-### Security Resources
-Query `securityresources` table for Defender for Cloud data, secure scores, and security recommendations.
+| Capability | How to use it | Example |
+|---|---|---|
+| **Resource Graph queries** | Pass KQL from `queries/resource-graph/*.kql` | `resources \| summarize count() by type` |
+| **Resource details** | Request by resource ID | Get diagnostic settings for a specific VM |
+| **Security data** | Query `securityresources` table | Defender for Cloud secure score, recommendations |
+| **Policy data** | Query `policyresources` table | Compliance state, policy assignments |
+| **Authorization data** | Query `authorizationresources` table | RBAC role assignments, role definitions |
 
-### Policy Resources
-Query `policyresources` table for compliance state, policy assignments, and initiative results.
-
-### Authorization Resources
-Query `authorizationresources` table for RBAC role assignments and role definitions.
+> **Note:** The Azure MCP Server operates in **read-only mode**. It cannot create, modify, or delete any Azure resource.
 
 ---
 
