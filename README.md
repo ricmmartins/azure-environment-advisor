@@ -308,8 +308,7 @@ azure-environment-advisor/
 │   └── enterprise.md                  # Assessment context for enterprise (200+ eng)
 ├── samples/
 │   └── sample-report.html             # Example assessment report
-├── README.md
-└── LICENSE
+└── README.md
 ```
 
 ## Differentiators vs. Existing Tools
@@ -401,15 +400,22 @@ npx @azure/mcp-server --help
 
 > If you see usage information, the server is installed. If you see an error, check that Node.js v18+ is installed (`node --version`).
 
-> **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions. If the package name has changed, update the `"args"` in the MCP configuration (step 4) to match.
+> **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions. If the package name has changed, update the `"args"` in the MCP configuration (step 5) to match.
 
-### 4. Configure MCP Server
+### 4. Clone This Repository
+
+```bash
+git clone https://github.com/ricmmartins/azure-environment-advisor.git
+cd azure-environment-advisor
+```
+
+### 5. Configure MCP Server
 
 The MCP configuration tells Copilot where to find the Azure MCP Server and which subscription to use. Replace `<your-subscription-id>` with the subscription ID from step 2 (the `Id` column from `az account show`).
 
 **For VS Code (recommended):**
 
-Create a file called `mcp.json` inside a `.vscode` folder in this repo:
+Create a file called `mcp.json` inside a `.vscode` folder in the cloned repo:
 
 ```
 azure-environment-advisor/
@@ -463,23 +469,23 @@ New-Item -ItemType Directory -Force -Path "$env:APPDATA\github-copilot"
 
 Then add the same JSON content as above.
 
-### 5. Clone This Repository
+### 6. Open in VS Code
+
+Open the project folder in VS Code so that Copilot can read the rules, queries, and profiles — and detect the MCP configuration:
 
 ```bash
-git clone https://github.com/ricmmartins/azure-environment-advisor.git
-cd azure-environment-advisor
+code .
 ```
 
-> **Important:** Open this folder in VS Code (`code .`) so that Copilot can read the rules, queries, and profiles.
+> If `code .` doesn't work, open VS Code manually, then use **File → Open Folder** and select the `azure-environment-advisor` folder.
 
-### 6. Run the Assessment
+### 7. Run the Assessment
 
 **In VS Code (recommended):**
 
-1. Open the project folder in VS Code
-2. Open **Copilot Chat** (`Ctrl+Shift+I` on Windows/Linux, `Cmd+Shift+I` on macOS)
-3. Make sure you're in **Agent mode** — look for the mode selector at the top of the chat panel. If it says "Ask" or "Edit", click it and switch to **"Agent"**
-4. Type your request:
+1. Open **Copilot Chat** (`Ctrl+Shift+I` on Windows/Linux, `Cmd+Shift+I` on macOS)
+2. Make sure you're in **Agent mode** — look for the mode selector at the top of the chat panel. If it says "Ask" or "Edit", click it and switch to **"Agent"**
+3. Type your request:
 
 ```
 Assess my Azure subscription
@@ -505,7 +511,7 @@ The agent will show its progress as it works:
 
 **Expected duration:** 3–5 minutes for small subscriptions (< 50 resources), 5–10 minutes for medium (50–500), 10–15 minutes for large (500+).
 
-### 7. View the Report
+### 8. View the Report
 
 When the assessment finishes, Copilot creates a single HTML file in the project folder, e.g.:
 
