@@ -347,7 +347,7 @@ Before you begin, here's what each piece does:
 
 | Requirement | What it is | Install link |
 |---|---|---|
-| **Azure subscription** | The Azure environment you want to assess. If you don't have one, [create a free Azure account](https://azure.microsoft.com/free/) (no credit card required for 30 days). | [azure.microsoft.com/free](https://azure.microsoft.com/free/) |
+| **Azure subscription** | The Azure environment you want to assess. If you don't have one, [create a free Azure account](https://azure.microsoft.com/free/) ($200 free credit for 30 days). | [azure.microsoft.com/free](https://azure.microsoft.com/free/) |
 | **GitHub Copilot** | AI assistant subscription (Individual, Business, or Enterprise). Needed to run the agent. | [github.com/features/copilot](https://github.com/features/copilot) |
 | **VS Code** | The recommended editor. Install the **GitHub Copilot** and **GitHub Copilot Chat** extensions from the Extensions marketplace (`Ctrl+Shift+X` → search "GitHub Copilot"). | [code.visualstudio.com](https://code.visualstudio.com/) |
 | **Node.js** (v18+) | Required to run the Azure MCP Server. | [nodejs.org](https://nodejs.org/) |
