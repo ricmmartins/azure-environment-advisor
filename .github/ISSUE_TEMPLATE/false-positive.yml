@@ -1,0 +1,69 @@
+name: "🐛 False Positive Report"
+description: "Report a rule that incorrectly flagged a resource or configuration"
+title: "[False Positive] "
+labels: ["false-positive", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve accuracy by reporting false positives. Please provide enough detail so we can reproduce and fix the issue.
+
+  - type: input
+    id: rule-id
+    attributes:
+      label: Rule ID
+      description: "Which rule produced the false positive? (e.g., SEC-001, REL-010)"
+      placeholder: "SEC-001"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: "Describe your Azure environment context (resource type, SKU, region, configuration)."
+      placeholder: |
+        - Resource: Azure SQL Database, General Purpose, Gen5
+        - Region: East US 2
+        - Configuration: Private endpoint enabled, public access disabled
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: "What should the rule have reported? Why is the current finding incorrect?"
+      placeholder: "The rule should have reported PASS because private endpoints are configured and public access is disabled."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: "What did the rule actually report?"
+      placeholder: "The rule flagged SEC-010 (public database endpoints) even though public access is disabled."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Environment Profile
+      description: "Which profile was the assessment run with?"
+      options:
+        - Startup
+        - Scale-up
+        - Enterprise
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: "Any other information that might help (screenshots, KQL query results, etc.)"
+    validations:
+      required: false

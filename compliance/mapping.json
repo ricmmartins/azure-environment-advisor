@@ -1,0 +1,1119 @@
+{
+  "_description": "Maps Azure Environment Advisor rule IDs to compliance framework controls. Used by the assessment agent to include compliance context in reports.",
+  "_usage": "When generating a report, the agent looks up each finding's rule_id in this mapping and includes the relevant compliance controls in the report.",
+  "_frameworks": {
+    "SOC2": "Service Organization Control 2 â€” Trust Services Criteria",
+    "ISO27001": "ISO/IEC 27001:2022 â€” Information Security Management",
+    "HIPAA": "Health Insurance Portability and Accountability Act",
+    "PCI-DSS": "Payment Card Industry Data Security Standard v4.0",
+    "NIST-CSF": "NIST Cybersecurity Framework 2.0"
+  },
+  "rules": {
+    "COST-001": {
+      "title": "No budget alerts configured",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.23 - Information security for use of cloud services"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "COST-002": {
+      "title": "No cost anomaly detection",
+      "controls": {
+        "SOC2": [
+          "CC7.2 - System Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.16 - Monitoring activities"
+        ],
+        "NIST-CSF": [
+          "DE.AE - Anomalies and Events"
+        ]
+      }
+    },
+    "COST-010": {
+      "title": "Unattached managed disks",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.9 - Inventory of information and other associated assets"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "COST-011": {
+      "title": "Orphaned public IP addresses",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.9 - Inventory of information and other associated assets"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "COST-012": {
+      "title": "Idle Network Interfaces",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.9 - Inventory of information and other associated assets"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "COST-013": {
+      "title": "Empty resource groups",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.9 - Inventory of information and other associated assets"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "COST-020": {
+      "title": "Over-provisioned VMs",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "COST-021": {
+      "title": "Dev/test resources using production SKUs",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment",
+          "CC8.1 - Change Management"
+        ],
+        "ISO27001": [
+          "A.8.31 - Separation of development, test and production environments"
+        ],
+        "PCI-DSS": [
+          "6.5 - Separation of development/test from production"
+        ],
+        "NIST-CSF": [
+          "PR.DS - Data Security"
+        ]
+      }
+    },
+    "COST-030": {
+      "title": "No reserved instances for steady-state workloads",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.23 - Information security for use of cloud services"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "COST-031": {
+      "title": "No savings plan coverage",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.23 - Information security for use of cloud services"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "GOV-001": {
+      "title": "No landing zone structure detected",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities"
+        ],
+        "ISO27001": [
+          "A.5.1 - Policies for information security",
+          "A.5.23 - Information security for use of cloud services"
+        ],
+        "PCI-DSS": [
+          "12.1 - Information security policy"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "GOV-002": {
+      "title": "Landing zone maturity gap",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities"
+        ],
+        "ISO27001": [
+          "A.5.23 - Information security for use of cloud services"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "GOV-010": {
+      "title": "All workloads in single subscription",
+      "controls": {
+        "SOC2": [
+          "CC6.6 - System Boundaries"
+        ],
+        "ISO27001": [
+          "A.8.22 - Segregation of networks"
+        ],
+        "PCI-DSS": [
+          "2.2 - System hardening standards"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "GOV-011": {
+      "title": "No prod/non-prod separation",
+      "controls": {
+        "SOC2": [
+          "CC6.6 - System Boundaries",
+          "CC8.1 - Change Management"
+        ],
+        "ISO27001": [
+          "A.8.31 - Separation of development, test and production environments"
+        ],
+        "PCI-DSS": [
+          "6.5 - Separation of development/test from production"
+        ],
+        "NIST-CSF": [
+          "PR.DS - Data Security"
+        ]
+      }
+    },
+    "GOV-012": {
+      "title": "Inconsistent naming convention",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities"
+        ],
+        "ISO27001": [
+          "A.5.9 - Inventory of information and other associated assets",
+          "A.5.10 - Acceptable use of information and other associated assets"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "GOV-020": {
+      "title": "No management group hierarchy",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities"
+        ],
+        "ISO27001": [
+          "A.5.1 - Policies for information security"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "GOV-021": {
+      "title": "Policies not assigned at management group level",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities"
+        ],
+        "ISO27001": [
+          "A.5.1 - Policies for information security"
+        ],
+        "PCI-DSS": [
+          "12.1 - Information security policy"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "OPS-001": {
+      "title": "No diagnostic settings configured",
+      "controls": {
+        "SOC2": [
+          "CC7.1 - System Monitoring",
+          "CC7.2 - System Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.15 - Logging",
+          "A.8.16 - Monitoring activities"
+        ],
+        "HIPAA": [
+          "Â§164.312(b) - Audit Controls"
+        ],
+        "PCI-DSS": [
+          "10.1 - Audit trails",
+          "10.2 - Automated audit trails"
+        ],
+        "NIST-CSF": [
+          "DE.CM - Security Continuous Monitoring"
+        ]
+      }
+    },
+    "OPS-002": {
+      "title": "No Log Analytics workspace",
+      "controls": {
+        "SOC2": [
+          "CC7.1 - System Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.15 - Logging"
+        ],
+        "HIPAA": [
+          "Â§164.312(b) - Audit Controls"
+        ],
+        "PCI-DSS": [
+          "10.1 - Audit trails"
+        ],
+        "NIST-CSF": [
+          "DE.CM - Security Continuous Monitoring"
+        ]
+      }
+    },
+    "OPS-003": {
+      "title": "Resources missing diagnostic settings",
+      "controls": {
+        "SOC2": [
+          "CC7.1 - System Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.15 - Logging"
+        ],
+        "HIPAA": [
+          "Â§164.312(b) - Audit Controls"
+        ],
+        "PCI-DSS": [
+          "10.2 - Automated audit trails"
+        ],
+        "NIST-CSF": [
+          "DE.CM - Security Continuous Monitoring"
+        ]
+      }
+    },
+    "OPS-010": {
+      "title": "No Azure Policy assignments",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities",
+          "CC8.1 - Change Management"
+        ],
+        "ISO27001": [
+          "A.5.1 - Policies for information security"
+        ],
+        "PCI-DSS": [
+          "12.1 - Information security policy"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "OPS-011": {
+      "title": "No tagging strategy",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment"
+        ],
+        "ISO27001": [
+          "A.5.9 - Inventory of information and other associated assets"
+        ],
+        "NIST-CSF": [
+          "ID.AM - Asset Management"
+        ]
+      }
+    },
+    "OPS-012": {
+      "title": "Non-compliant policy resources",
+      "controls": {
+        "SOC2": [
+          "CC5.1 - Control Activities"
+        ],
+        "ISO27001": [
+          "A.5.1 - Policies for information security"
+        ],
+        "PCI-DSS": [
+          "12.1 - Information security policy"
+        ],
+        "NIST-CSF": [
+          "ID.GV - Governance"
+        ]
+      }
+    },
+    "OPS-020": {
+      "title": "No evidence of IaC usage",
+      "controls": {
+        "SOC2": [
+          "CC8.1 - Change Management"
+        ],
+        "ISO27001": [
+          "A.8.9 - Configuration management",
+          "A.8.32 - Change management"
+        ],
+        "PCI-DSS": [
+          "6.5 - Separation of development/test from production"
+        ],
+        "NIST-CSF": [
+          "PR.IP - Information Protection"
+        ]
+      }
+    },
+    "OPS-021": {
+      "title": "No CI/CD deployment pattern",
+      "controls": {
+        "SOC2": [
+          "CC8.1 - Change Management"
+        ],
+        "ISO27001": [
+          "A.8.32 - Change management"
+        ],
+        "PCI-DSS": [
+          "6.3 - Security patches and updates"
+        ],
+        "NIST-CSF": [
+          "PR.IP - Information Protection"
+        ]
+      }
+    },
+    "OPS-030": {
+      "title": "No alert rules configured",
+      "controls": {
+        "SOC2": [
+          "CC7.2 - System Monitoring",
+          "CC7.3 - Detection and Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.16 - Monitoring activities"
+        ],
+        "HIPAA": [
+          "Â§164.312(b) - Audit Controls"
+        ],
+        "PCI-DSS": [
+          "10.6 - Review logs and security events"
+        ],
+        "NIST-CSF": [
+          "DE.AE - Anomalies and Events"
+        ]
+      }
+    },
+    "OPS-031": {
+      "title": "No action groups configured",
+      "controls": {
+        "SOC2": [
+          "CC7.4 - Incident Response"
+        ],
+        "ISO27001": [
+          "A.5.24 - Information security incident management planning"
+        ],
+        "NIST-CSF": [
+          "RS.CO - Communications"
+        ]
+      }
+    },
+    "OPS-032": {
+      "title": "No Service Health alerts",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.16 - Monitoring activities"
+        ],
+        "NIST-CSF": [
+          "DE.CM - Security Continuous Monitoring"
+        ]
+      }
+    },
+    "PERF-001": {
+      "title": "App Service using Basic tier in production",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-002": {
+      "title": "VM using previous generation size",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-003": {
+      "title": "AKS using default node pool only",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-010": {
+      "title": "No caching layer detected",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-011": {
+      "title": "CDN not configured for static assets",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-020": {
+      "title": "SQL Database using DTU model",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-021": {
+      "title": "SQL Database on lowest tier",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "PERF-022": {
+      "title": "Cosmos DB using provisioned throughput without autoscale",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "REL-001": {
+      "title": "Azure SQL not zone-redundant",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.14 - Redundancy of information processing facilities"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "REL-002": {
+      "title": "App Service not zone-redundant",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.14 - Redundancy of information processing facilities"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "REL-003": {
+      "title": "Storage not using ZRS/GRS",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.14 - Redundancy of information processing facilities",
+          "A.8.13 - Information backup"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan",
+          "Â§164.310(d)(2)(iv) - Data Backup and Storage"
+        ],
+        "PCI-DSS": [
+          "9.5 - Protect POS devices from tampering"
+        ],
+        "NIST-CSF": [
+          "PR.DS - Data Security",
+          "PR.IP - Information Protection"
+        ]
+      }
+    },
+    "REL-004": {
+      "title": "AKS not using availability zones",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.14 - Redundancy of information processing facilities"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "REL-010": {
+      "title": "No backup policy for Azure VMs",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives",
+          "A1.3 - Recovery Testing"
+        ],
+        "ISO27001": [
+          "A.8.13 - Information backup"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan",
+          "Â§164.310(d)(2)(iv) - Data Backup and Storage"
+        ],
+        "PCI-DSS": [
+          "9.5 - Media backups"
+        ],
+        "NIST-CSF": [
+          "PR.IP - Information Protection"
+        ]
+      }
+    },
+    "REL-011": {
+      "title": "SQL Database no long-term retention",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.13 - Information backup"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "NIST-CSF": [
+          "PR.IP - Information Protection"
+        ]
+      }
+    },
+    "REL-012": {
+      "title": "No geo-replication for critical databases",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.14 - Redundancy of information processing facilities"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "NIST-CSF": [
+          "PR.DS - Data Security"
+        ]
+      }
+    },
+    "REL-013": {
+      "title": "Blob soft delete not enabled",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.13 - Information backup"
+        ],
+        "NIST-CSF": [
+          "PR.IP - Information Protection"
+        ]
+      }
+    },
+    "REL-020": {
+      "title": "No autoscale configured for compute",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "REL-021": {
+      "title": "Load balancer without health probes",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability"
+        ],
+        "ISO27001": [
+          "A.8.6 - Capacity management"
+        ],
+        "NIST-CSF": [
+          "DE.CM - Security Continuous Monitoring"
+        ]
+      }
+    },
+    "REL-022": {
+      "title": "Single instance VM (no availability)",
+      "controls": {
+        "SOC2": [
+          "A1.1 - System Availability",
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.8.14 - Redundancy of information processing facilities"
+        ],
+        "NIST-CSF": [
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "REL-030": {
+      "title": "No multi-region strategy",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives",
+          "A1.3 - Recovery Testing"
+        ],
+        "ISO27001": [
+          "A.5.30 - ICT readiness for business continuity"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "PCI-DSS": [
+          "12.10 - Incident response plan"
+        ],
+        "NIST-CSF": [
+          "RC.RP - Recovery Planning"
+        ]
+      }
+    },
+    "REL-031": {
+      "title": "No documented RPO/RTO targets",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives"
+        ],
+        "ISO27001": [
+          "A.5.30 - ICT readiness for business continuity"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "NIST-CSF": [
+          "RC.RP - Recovery Planning"
+        ]
+      }
+    },
+    "REL-032": {
+      "title": "Site Recovery not configured for VMs",
+      "controls": {
+        "SOC2": [
+          "A1.2 - Recovery Objectives",
+          "A1.3 - Recovery Testing"
+        ],
+        "ISO27001": [
+          "A.5.30 - ICT readiness for business continuity"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(7) - Contingency Plan"
+        ],
+        "NIST-CSF": [
+          "RC.RP - Recovery Planning"
+        ]
+      }
+    },
+    "SEC-001": {
+      "title": "Defender for Cloud not enabled",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls",
+          "CC7.1 - System Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.7 - Protection against malware",
+          "A.8.16 - Monitoring activities"
+        ],
+        "HIPAA": [
+          "Â§164.312(a)(1) - Access Control",
+          "Â§164.312(b) - Audit Controls"
+        ],
+        "PCI-DSS": [
+          "6.4 - Public-facing web applications protection",
+          "10.6 - Review logs and security events"
+        ],
+        "NIST-CSF": [
+          "DE.CM - Security Continuous Monitoring",
+          "PR.DS - Data Security"
+        ]
+      }
+    },
+    "SEC-002": {
+      "title": "Secure Score below 50%",
+      "controls": {
+        "SOC2": [
+          "CC3.1 - Risk Assessment",
+          "CC7.2 - System Monitoring"
+        ],
+        "ISO27001": [
+          "A.8.8 - Management of technical vulnerabilities"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(1) - Security Management Process"
+        ],
+        "PCI-DSS": [
+          "6.1 - Identify security vulnerabilities"
+        ],
+        "NIST-CSF": [
+          "ID.RA - Risk Assessment"
+        ]
+      }
+    },
+    "SEC-003": {
+      "title": "Security contact not configured",
+      "controls": {
+        "SOC2": [
+          "CC2.2 - Internal Communication"
+        ],
+        "ISO27001": [
+          "A.5.5 - Contact with authorities",
+          "A.5.6 - Contact with special interest groups"
+        ],
+        "HIPAA": [
+          "Â§164.308(a)(2) - Assigned Security Responsibility"
+        ],
+        "PCI-DSS": [
+          "12.10.1 - Incident response plan"
+        ],
+        "NIST-CSF": [
+          "RS.CO - Communications"
+        ]
+      }
+    },
+    "SEC-010": {
+      "title": "Public database endpoints",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls",
+          "CC6.6 - System Boundaries"
+        ],
+        "ISO27001": [
+          "A.8.20 - Networks security",
+          "A.8.22 - Segregation of networks"
+        ],
+        "HIPAA": [
+          "Â§164.312(e)(1) - Transmission Security"
+        ],
+        "PCI-DSS": [
+          "1.3 - Network access to cardholder data environment",
+          "2.2.7 - Non-console administrative access encryption"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control",
+          "PR.DS - Data Security"
+        ]
+      }
+    },
+    "SEC-011": {
+      "title": "NSG missing on subnet",
+      "controls": {
+        "SOC2": [
+          "CC6.6 - System Boundaries"
+        ],
+        "ISO27001": [
+          "A.8.22 - Segregation of networks"
+        ],
+        "HIPAA": [
+          "Â§164.312(e)(1) - Transmission Security"
+        ],
+        "PCI-DSS": [
+          "1.2 - Network security controls"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-012": {
+      "title": "Storage account allows public blob access",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls"
+        ],
+        "ISO27001": [
+          "A.8.3 - Information access restriction"
+        ],
+        "HIPAA": [
+          "Â§164.312(a)(1) - Access Control"
+        ],
+        "PCI-DSS": [
+          "3.4 - Render PAN unreadable anywhere it is stored"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-013": {
+      "title": "No Azure Firewall or NVA for egress filtering",
+      "controls": {
+        "SOC2": [
+          "CC6.6 - System Boundaries"
+        ],
+        "ISO27001": [
+          "A.8.20 - Networks security"
+        ],
+        "HIPAA": [
+          "Â§164.312(e)(1) - Transmission Security"
+        ],
+        "PCI-DSS": [
+          "1.4 - Control connections between trusted and untrusted networks"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control",
+          "PR.PT - Protective Technology"
+        ]
+      }
+    },
+    "SEC-014": {
+      "title": "Public IP addresses on VMs",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls"
+        ],
+        "ISO27001": [
+          "A.8.20 - Networks security"
+        ],
+        "PCI-DSS": [
+          "1.3 - Network access to cardholder data environment"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-020": {
+      "title": "RBAC uses direct user assignments",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls",
+          "CC6.3 - Role-Based Access"
+        ],
+        "ISO27001": [
+          "A.5.15 - Access control",
+          "A.8.2 - Privileged access rights"
+        ],
+        "HIPAA": [
+          "Â§164.312(a)(1) - Access Control"
+        ],
+        "PCI-DSS": [
+          "7.1 - Limit access to system components"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-021": {
+      "title": "Too many Owner/Contributor assignments",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls",
+          "CC6.3 - Role-Based Access"
+        ],
+        "ISO27001": [
+          "A.8.2 - Privileged access rights"
+        ],
+        "HIPAA": [
+          "Â§164.312(a)(1) - Access Control"
+        ],
+        "PCI-DSS": [
+          "7.1 - Limit access to system components",
+          "7.2 - Appropriate access control system"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-022": {
+      "title": "No MFA enforcement detected",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls"
+        ],
+        "ISO27001": [
+          "A.8.5 - Secure authentication"
+        ],
+        "HIPAA": [
+          "Â§164.312(d) - Person or Entity Authentication"
+        ],
+        "PCI-DSS": [
+          "8.4 - Multi-factor authentication"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-023": {
+      "title": "No break-glass account pattern",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls"
+        ],
+        "ISO27001": [
+          "A.8.2 - Privileged access rights"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-030": {
+      "title": "No Key Vault deployed",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls"
+        ],
+        "ISO27001": [
+          "A.8.24 - Use of cryptography"
+        ],
+        "HIPAA": [
+          "Â§164.312(a)(2)(iv) - Encryption and Decryption"
+        ],
+        "PCI-DSS": [
+          "3.5 - Protect stored account data cryptographic keys"
+        ],
+        "NIST-CSF": [
+          "PR.DS - Data Security"
+        ]
+      }
+    },
+    "SEC-031": {
+      "title": "Key Vault using access policies instead of RBAC",
+      "controls": {
+        "SOC2": [
+          "CC6.3 - Role-Based Access"
+        ],
+        "ISO27001": [
+          "A.5.15 - Access control"
+        ],
+        "PCI-DSS": [
+          "7.2 - Appropriate access control system"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    },
+    "SEC-032": {
+      "title": "Managed identities not used",
+      "controls": {
+        "SOC2": [
+          "CC6.1 - Logical and Physical Access Controls"
+        ],
+        "ISO27001": [
+          "A.8.5 - Secure authentication"
+        ],
+        "PCI-DSS": [
+          "8.6 - Authentication mechanisms for non-consumer users"
+        ],
+        "NIST-CSF": [
+          "PR.AC - Access Control"
+        ]
+      }
+    }
+  }
+}

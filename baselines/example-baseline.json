@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "subscription_id": "00000000-0000-0000-0000-000000000000",
+    "subscription_name": "contoso-prod",
+    "profile": "startup",
+    "date": "2026-01-15",
+    "total_resources": 42,
+    "regions": ["eastus2"]
+  },
+  "findings": [
+    {
+      "rule_id": "SEC-001",
+      "title": "Defender for Cloud not enabled",
+      "severity": "Critical",
+      "pillar": "Security",
+      "resources": ["subscription-level"],
+      "status": "finding"
+    },
+    {
+      "rule_id": "SEC-010",
+      "title": "Public database endpoints",
+      "severity": "Critical",
+      "pillar": "Security",
+      "resources": ["sql-contoso-prod"],
+      "status": "finding"
+    },
+    {
+      "rule_id": "OPS-001",
+      "title": "No diagnostic settings configured",
+      "severity": "High",
+      "pillar": "Operational Excellence",
+      "resources": ["subscription-level"],
+      "status": "finding"
+    },
+    {
+      "rule_id": "COST-010",
+      "title": "Orphaned managed disks",
+      "severity": "Medium",
+      "pillar": "Cost Optimization",
+      "resources": ["disk-old-backup", "disk-test-01"],
+      "status": "finding"
+    },
+    {
+      "rule_id": "REL-001",
+      "title": "Azure SQL not zone-redundant",
+      "severity": "Low",
+      "pillar": "Reliability",
+      "resources": ["sql-contoso-prod"],
+      "status": "finding"
+    }
+  ],
+  "passed": ["SEC-002", "SEC-003", "SEC-030", "SEC-031", "COST-001", "OPS-002"]
+}

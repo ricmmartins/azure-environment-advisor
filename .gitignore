@@ -1,0 +1,18 @@
+# Generated assessment baselines (keep schema and example)
+baselines/baseline-*.json
+!baselines/baseline-schema.json
+!baselines/example-baseline.json
+
+# Generated assessment reports
+assessment-*.html
+
+# Python
+__pycache__/
+*.pyc
+
+# VS Code MCP config (contains subscription IDs)
+.vscode/mcp.json
+
+# OS files
+.DS_Store
+Thumbs.db

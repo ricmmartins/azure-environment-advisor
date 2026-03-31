@@ -385,3 +385,63 @@ The Azure MCP Server exposes its tools automatically via the Model Context Proto
 - Some rules may require data that the Azure MCP Server doesn't expose (e.g., detailed network watcher flow logs, application-level configs)
 - Mark these as "Not Evaluated" in the Assessment Limitations section
 - Never fabricate findings — only report what you can verify from actual data
+
+---
+
+## Phase 6: Baseline for Drift Detection
+
+After generating the HTML report, **also generate a JSON baseline file** so future assessments can be compared.
+
+1. Save the baseline to `baselines/baseline-YYYY-MM-DD.json` (using the assessment date)
+2. Follow the schema defined in `baselines/baseline-schema.json`
+3. Include:
+   - `metadata`: subscription_id, subscription_name, profile, date, total_resources, regions
+   - `findings`: array of all findings (rule_id, title, severity, pillar, affected resources, status)
+   - `passed`: array of rule IDs that passed (no finding)
+
+When the user asks to **compare** or **detect drift**, use `scripts/compare-assessments.py`:
+```
+python scripts/compare-assessments.py --baseline baselines/baseline-2026-01-01.json --current baselines/baseline-2026-02-01.json
+```
+
+This shows: new findings, resolved findings, severity escalations/de-escalations, and unchanged findings.
+
+---
+
+## Phase 7: Compliance Mapping
+
+When generating the report, include **compliance framework context** for each finding:
+
+1. Read `compliance/mapping.json` — it maps each rule ID to controls in SOC2, ISO27001, HIPAA, PCI-DSS, and NIST-CSF
+2. For each finding in the report, include a "Compliance Impact" section listing the relevant framework controls
+3. At the end of the report, include a **Compliance Summary** table showing:
+   - Which frameworks have controls impacted by findings
+   - Count of impacted controls per framework
+   - A note that this is a mapping aid, not a formal compliance assessment
+
+Example in a finding card:
+```
+Compliance Impact:
+  • SOC2: CC6.1 - Logical and Physical Access Controls
+  • ISO27001: A.8.20 - Networks security
+  • HIPAA: §164.312(e)(1) - Transmission Security
+  • PCI-DSS: 1.3 - Network access to cardholder data environment
+```
+
+---
+
+## Phase 8: GitHub Issue Creation
+
+When the user asks to **create issues** from assessment findings:
+
+1. Use the `scripts/create-issues-from-report.py` script
+2. By default, create issues only for **Critical** and **High** severity findings
+3. Each issue includes: rule ID, title, affected resources, recommendation, and Learn More links
+4. Issues are labeled with: `assessment-finding`, `pillar:<name>`, `severity:<level>`
+
+Usage:
+```
+python scripts/create-issues-from-report.py --report assessment-report.html
+python scripts/create-issues-from-report.py --report assessment-report.html --dry-run
+python scripts/create-issues-from-report.py --report assessment-report.html --severity Critical High Medium
+```

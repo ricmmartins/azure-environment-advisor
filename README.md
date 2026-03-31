@@ -261,7 +261,14 @@ The agent's intelligence comes from a `.github/copilot-instructions.md` file tha
 ```
 azure-environment-advisor/
 ├── .github/
-│   └── copilot-instructions.md       # Agent behavior + assessment methodology
+│   ├── copilot-instructions.md       # Agent behavior + assessment methodology
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── new-rule-request.yml      # Template: propose a new assessment rule
+│   │   ├── false-positive.yml        # Template: report a false positive finding
+│   │   └── bug-report.yml            # Template: report a bug
+│   └── workflows/
+│       ├── validate-rules.yml        # CI: validates rule files on every PR
+│       └── scheduled-assessment.yml  # Scheduled periodic assessments
 ├── rules/
 │   ├── security/
 │   │   ├── defender-plans.md          # Defender for Cloud assessment rules
@@ -306,6 +313,15 @@ azure-environment-advisor/
 │   ├── startup.md                     # Assessment context for startups (5-50 eng)
 │   ├── scaleup.md                     # Assessment context for scale-ups (50-200 eng)
 │   └── enterprise.md                  # Assessment context for enterprise (200+ eng)
+├── scripts/
+│   ├── validate-rules.py              # Rule file validation (CI + local)
+│   ├── create-issues-from-report.py   # Create GitHub Issues from findings
+│   └── compare-assessments.py         # Drift detection between baselines
+├── baselines/
+│   ├── baseline-schema.json           # JSON schema for assessment baselines
+│   └── example-baseline.json          # Example baseline for reference
+├── compliance/
+│   └── mapping.json                   # Rule-to-compliance-framework mapping
 ├── samples/
 │   └── sample-report.html             # Example assessment report
 └── README.md
@@ -541,11 +557,123 @@ Open it in any browser (double-click the file, or right-click → "Open with" �
 
 ### Customization
 
-**Add your own rules:** Create a new `.md` file in the appropriate `rules/` subfolder following the existing format. The agent automatically picks up all rules.
+**Add your own rules:** Create a new `.md` file in the appropriate `rules/` subfolder following the existing format. The agent automatically picks up all rules. Use the [New Rule Request](../../issues/new?template=new-rule-request.yml) issue template to propose rules.
 
 **Adjust severity for your context:** Edit the profile files in `profiles/` to change how severity is calibrated for your company stage.
 
 **Modify queries:** Add or edit `.kql` files in `queries/resource-graph/` to expand what the agent discovers.
+
+**Validate your changes:** Run the rule validation script to ensure your changes are consistent:
+
+```bash
+python scripts/validate-rules.py --verbose
+```
+
+## Drift Detection
+
+Track how your Azure environment evolves over time by comparing assessment baselines.
+
+### How It Works
+
+1. Each assessment generates a **JSON baseline** file in `baselines/` (alongside the HTML report)
+2. Run the comparison script to see what changed between two assessments:
+
+```bash
+python scripts/compare-assessments.py \
+  --baseline baselines/baseline-2026-01-15.json \
+  --current baselines/baseline-2026-02-15.json
+```
+
+3. The report shows:
+   - 🆕 **New findings** — issues that appeared since the last assessment
+   - ✅ **Resolved findings** — issues that were fixed
+   - ⬆️ **Escalated** — severity increased (e.g., Medium → High)
+   - ⬇️ **De-escalated** — severity decreased
+   - ➡️ **Unchanged** — still present with same severity
+
+### CI/CD Integration
+
+Use `--fail-on-regression` to fail a CI pipeline if new Critical/High findings appear:
+
+```bash
+python scripts/compare-assessments.py \
+  --baseline baselines/baseline-previous.json \
+  --current baselines/baseline-current.json \
+  --fail-on-regression
+```
+
+The baseline schema is defined in `baselines/baseline-schema.json` with an example in `baselines/example-baseline.json`.
+
+## Auto-Create GitHub Issues
+
+Convert assessment findings into trackable GitHub Issues automatically:
+
+```bash
+# Preview what would be created (dry run)
+python scripts/create-issues-from-report.py --report assessment-report.html --dry-run
+
+# Create issues for Critical and High findings (default)
+python scripts/create-issues-from-report.py --report assessment-report.html
+
+# Create issues for all severities
+python scripts/create-issues-from-report.py --report assessment-report.html --severity Critical High Medium Low
+
+# Add custom labels
+python scripts/create-issues-from-report.py --report assessment-report.html --labels "sprint-1,team-platform"
+```
+
+Each issue includes:
+- Rule ID and title
+- Severity and pillar labels
+- Affected resources
+- Remediation guidance
+- Microsoft Learn documentation links
+
+> **Requirement:** GitHub CLI (`gh`) must be installed and authenticated.
+
+## Compliance Framework Mapping
+
+Findings are mapped to controls in 5 compliance frameworks:
+
+| Framework | Coverage |
+|-----------|----------|
+| **SOC2** | Trust Services Criteria (CC, A1) |
+| **ISO 27001** | ISO/IEC 27001:2022 Annex A controls |
+| **HIPAA** | §164.308, §164.310, §164.312 |
+| **PCI-DSS** | PCI DSS v4.0 requirements |
+| **NIST CSF** | NIST Cybersecurity Framework 2.0 functions |
+
+The mapping is stored in `compliance/mapping.json` and is automatically included in the assessment report. Each finding card shows which compliance controls are impacted, and the report includes a Compliance Summary section.
+
+> **Note:** This mapping is a guidance aid for audit preparation — it is not a formal compliance assessment or certification.
+
+## Contributing
+
+We welcome contributions! Here's how:
+
+1. **Propose a new rule** — Use the [New Rule Request](../../issues/new?template=new-rule-request.yml) issue template
+2. **Report a false positive** — Use the [False Positive](../../issues/new?template=false-positive.yml) issue template
+3. **Report a bug** — Use the [Bug Report](../../issues/new?template=bug-report.yml) issue template
+4. **Submit a PR** — The `validate-rules.yml` workflow will automatically validate your rule files
+
+### Rule Validation
+
+All rule files are validated on every PR by the CI pipeline. You can also run validation locally:
+
+```bash
+# Text output with warnings
+python scripts/validate-rules.py --verbose
+
+# JSON output (for programmatic use)
+python scripts/validate-rules.py --output json
+```
+
+The validator checks:
+- Required sections (`What to Check`, `Finding Template`, `Learn More`)
+- Valid rule ID format (e.g., `SEC-001`, `REL-010`)
+- Pillar consistency (rule prefix matches declared pillar)
+- Severity values
+- Profile coverage (every rule should appear in profile severity tables)
 
 ## Glossary
 
@@ -566,12 +694,11 @@ Open it in any browser (double-click the file, or right-click → "Open with" �
 ## Future Possibilities
 
 - **Multi-subscription assessment** — scan all subs under a management group
-- **Drift detection** — compare current state against a baseline (previous assessment)
-- **Compliance mapping** — map findings to SOC2/HIPAA/PCI controls
 - **Team recommendations** — suggest organizational changes (when to hire a platform team)
-- **Integration with Azure DevOps / GitHub Issues** — auto-create work items for findings
-- **Scheduled assessments** — periodic re-assessment via GitHub Actions
-- **Community rules** — let users contribute assessment rules (like ESLint plugins)
+- **Trend dashboards** — visualize drift detection results over time in a web dashboard
+- **Rule marketplace** — community-contributed rule packs for specific industries (healthcare, finance, gaming)
+- **Integration with Azure Monitor** — correlate findings with actual availability/performance metrics
+- **AI-powered remediation** — generate IaC (Bicep/Terraform) patches to fix findings automatically
 
 ## Relationship to SSLZ
 

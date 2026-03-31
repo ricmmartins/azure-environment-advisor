@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assessment Baseline",
+  "description": "Schema for Azure Environment Advisor assessment baselines used in drift detection",
+  "type": "object",
+  "required": ["metadata", "findings"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["subscription_id", "date", "profile"],
+      "properties": {
+        "subscription_id": {
+          "type": "string",
+          "description": "Azure Subscription ID"
+        },
+        "subscription_name": {
+          "type": "string",
+          "description": "Azure Subscription display name"
+        },
+        "profile": {
+          "type": "string",
+          "enum": ["startup", "scaleup", "enterprise"],
+          "description": "Environment profile used for severity calibration"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Assessment date (YYYY-MM-DD)"
+        },
+        "total_resources": {
+          "type": "integer",
+          "description": "Total number of resources scanned"
+        },
+        "regions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Azure regions where resources were found"
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "severity", "pillar"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "pattern": "^(SEC|REL|COST|OPS|PERF|GOV)-\\d{3}$",
+            "description": "Rule identifier (e.g., SEC-001)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Finding title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low", "Informational"]
+          },
+          "pillar": {
+            "type": "string",
+            "description": "WAF pillar"
+          },
+          "resources": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of affected resource names or IDs"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["finding", "exception"],
+            "default": "finding",
+            "description": "Whether this is an active finding or an accepted exception"
+          }
+        }
+      }
+    },
+    "passed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of rule IDs that passed (no finding)"
+    }
+  }
+}

@@ -87,6 +87,10 @@ resources
 **Why it matters:** Orphaned NICs create management clutter and may retain associated public IPs that incur charges. They are commonly left behind after VM deletions and make it harder to maintain a clean, auditable environment.  
 **Recommendation:** Review and delete idle NICs that are no longer needed. Check whether they have associated public IPs or NSGs that should also be cleaned up.
 
+### Learn More
+- [Azure best practices for cost management](https://learn.microsoft.com/azure/cost-management-billing/costs/cost-mgt-best-practices)
+- [Virtual network interface cards overview](https://learn.microsoft.com/azure/virtual-network/virtual-network-network-interface)
+
 ---
 
 ## COST-013 — Empty resource groups
@@ -115,3 +119,7 @@ resourcecontainers
 **What was found:** Found {count} resource group(s) with no resources in subscription `{subscriptionName}`.  
 **Why it matters:** While empty resource groups do not incur direct costs, they add management overhead, make it harder to navigate the environment, and may indicate incomplete cleanup after resource deletions or failed deployments.  
 **Recommendation:** Review and delete empty resource groups that are no longer needed. Verify they are not placeholders for upcoming deployments before deleting.
+
+### Learn More
+- [Azure best practices for cost management](https://learn.microsoft.com/azure/cost-management-billing/costs/cost-mgt-best-practices)
+- [Manage Azure resource groups](https://learn.microsoft.com/azure/azure-resource-manager/management/manage-resource-groups-portal)

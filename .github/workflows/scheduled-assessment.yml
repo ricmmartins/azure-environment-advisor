@@ -1,0 +1,101 @@
+name: Scheduled Assessment
+
+on:
+  schedule:
+    # Runs every Monday at 8:00 AM UTC — adjust to your needs
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+    inputs:
+      subscription_id:
+        description: 'Azure Subscription ID to assess'
+        required: true
+        type: string
+      profile:
+        description: 'Environment profile'
+        required: true
+        type: choice
+        options:
+          - startup
+          - scaleup
+          - enterprise
+
+env:
+  # Default subscription — override via workflow_dispatch input or repository secret
+  AZURE_SUBSCRIPTION_ID: ${{ inputs.subscription_id || secrets.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  assess:
+    name: Run Assessment
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure MCP Server
+        run: npm install -g @azure/mcp-server
+
+      - name: Run Assessment
+        id: assess
+        run: |
+          echo "::notice::Assessment started for subscription ${{ env.AZURE_SUBSCRIPTION_ID }}"
+          echo "::notice::This step requires GitHub Copilot agent integration."
+          echo ""
+          echo "To run the assessment manually:"
+          echo "  1. Open this repo in VS Code with Copilot Agent mode"
+          echo "  2. Ask: 'Assess my Azure subscription ${{ env.AZURE_SUBSCRIPTION_ID }}'"
+          echo "  3. The agent will generate an HTML report"
+          echo ""
+          echo "For automated assessment, integrate with the Azure MCP Server API."
+          echo "See: https://github.com/Azure/azure-mcp-server"
+
+      # Save assessment baseline for drift detection
+      - name: Save baseline
+        if: success()
+        run: |
+          mkdir -p baselines
+          TIMESTAMP=$(date +%Y-%m-%d)
+          echo "Baseline placeholder for $TIMESTAMP" > baselines/baseline-$TIMESTAMP.json
+          echo "baseline_date=$TIMESTAMP" >> $GITHUB_OUTPUT
+
+      - name: Upload assessment report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assessment-report-${{ github.run_number }}
+          path: |
+            assessment-*.html
+            baselines/*.json
+          retention-days: 90
+
+      # Auto-create issues for critical findings
+      - name: Create issues from findings
+        if: success() && hashFiles('assessment-*.html') != ''
+        run: |
+          echo "To auto-create GitHub Issues from findings, run:"
+          echo "  python scripts/create-issues-from-report.py --report assessment-*.html"
+          echo ""
+          echo "This will create one issue per Critical/High finding with:"
+          echo "  - Rule ID and title"
+          echo "  - Affected resources"
+          echo "  - Remediation guidance"
+          echo "  - Microsoft Learn documentation links"

@@ -1,0 +1,102 @@
+name: "🆕 New Rule Request"
+description: "Propose a new assessment rule for the Azure Environment Advisor"
+title: "[Rule Request] "
+labels: ["rule-request", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a new rule! Please fill out the details below so we can evaluate and implement it.
+
+  - type: dropdown
+    id: pillar
+    attributes:
+      label: WAF Pillar
+      description: Which Well-Architected Framework pillar does this rule belong to?
+      options:
+        - Security
+        - Reliability
+        - Cost Optimization
+        - Operational Excellence
+        - Performance Efficiency
+        - Governance
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Default Severity
+      description: What severity should this rule have by default?
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+        - Informational
+    validations:
+      required: true
+
+  - type: input
+    id: rule-title
+    attributes:
+      label: Rule Title
+      description: "Short title for the rule (e.g., 'No backup policy for VMs')"
+      placeholder: "Describe the finding in a few words"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-to-check
+    attributes:
+      label: What to Check
+      description: "Describe what the rule should verify. Include a KQL query if possible."
+      placeholder: |
+        Check if Azure SQL databases have zone-redundancy enabled.
+        
+        ```kusto
+        resources
+        | where type =~ "microsoft.sql/servers/databases"
+        | where properties.zoneRedundant == false
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-it-matters
+    attributes:
+      label: Why It Matters
+      description: "Explain the risk or impact if this check fails."
+      placeholder: "Without zone-redundancy, a single availability zone failure could cause downtime..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation
+      description: "What should the user do to remediate this finding?"
+      placeholder: "Enable zone-redundancy on the database..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: learn-more
+    attributes:
+      label: Learn More Links
+      description: "Provide Microsoft Learn documentation links for remediation guidance."
+      placeholder: "https://learn.microsoft.com/azure/..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: profile-notes
+    attributes:
+      label: Profile-Specific Notes
+      description: "Should severity differ for startup, scale-up, or enterprise environments?"
+      placeholder: |
+        - Startup: Low (cost prohibitive at this stage)
+        - Scale-up: Medium
+        - Enterprise: High
+    validations:
+      required: false

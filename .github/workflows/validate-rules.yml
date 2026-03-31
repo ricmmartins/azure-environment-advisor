@@ -1,0 +1,43 @@
+name: Validate Rules
+
+on:
+  pull_request:
+    paths:
+      - 'rules/**'
+      - 'profiles/**'
+      - 'scripts/validate-rules.py'
+  push:
+    branches: [main]
+    paths:
+      - 'rules/**'
+      - 'profiles/**'
+      - 'scripts/validate-rules.py'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate Rule Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run rule validation
+        run: python scripts/validate-rules.py --verbose
+
+      - name: Run rule validation (JSON output)
+        if: always()
+        run: python scripts/validate-rules.py --output json > validation-report.json
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation-report.json
