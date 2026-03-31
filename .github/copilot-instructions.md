@@ -268,7 +268,7 @@ If the assessment has many passed checks, include a collapsible summary after th
   <h2>✅ Passed Checks (22)</h2>
   <details>
     <summary>Click to expand</summary>
-    <ul>
+    <ul style="padding-left: 1.5rem; list-style-position: inside;">
       <li>SEC-012 — Storage accounts have public blob access disabled</li>
       <li>REL-020 — Autoscale configured for App Service Plan</li>
       <!-- ... -->
