@@ -648,6 +648,8 @@ Each issue includes:
 - Microsoft Learn documentation links
 
 > **Requirement:** GitHub CLI (`gh`) must be installed and authenticated.
+>
+> **See it in action:** Check out the [example issues](https://github.com/ricmmartins/azure-environment-advisor/issues) created from a real assessment run.
 
 ## Compliance Framework Mapping
 
