@@ -513,7 +513,7 @@ Copilot will read the `.github/copilot-instructions.md` file, connect to Azure v
 
 From the project directory:
 ```bash
-gh copilot -p "Assess my Azure subscription using the rules in this project"
+gh copilot -- -p "Assess my Azure subscription using the rules in this project" --allow-all
 ```
 
 **What to expect:**
