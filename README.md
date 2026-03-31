@@ -57,21 +57,21 @@ An AI agent (powered by GitHub Copilot + Azure MCP Server) that:
 ┌─────────────────────────────────────────────────────────────┐
 │  Azure Environment Advisor Agent                            │
 │                                                             │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐ │
-│  │ Discovery    │  │ Assessment   │  │ Report             │ │
-│  │ Engine       │→ │ Engine       │→ │ Generator          │ │
-│  │              │  │              │  │                    │ │
-│  │ • Resources  │  │ • WAF Rules  │  │ • HTML dashboard   │ │
-│  │ • Configs    │  │ • CAF Rules  │  │ • Severity scores  │ │
-│  │ • Policies   │  │ • ALZ Rules  │  │ • MS Learn links   │ │
-│  │ • Networking │  │ • Custom     │  │ • Pillar breakdown │ │
-│  │ • RBAC       │  │   Rules      │  │ • Filters          │ │
-│  │ • Defender   │  │              │  │                    │ │
-│  │ • Monitoring │  │ Contextual:  │  │                    │ │
-│  │ • Budgets    │  │ • Stage      │  │                    │ │
-│  │              │  │ • Size       │  │                    │ │
-│  │              │  │ • Complexity │  │                    │ │
-│  └─────────────┘  └──────────────┘  └────────────────────┘ │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
+│  │ Discovery   │  │ Assessment   │  │ Report             │  │
+│  │ Engine      │→ │ Engine       │→ │ Generator          │  │
+│  │             │  │              │  │                    │  │
+│  │ • Resources │  │ • WAF Rules  │  │ • HTML dashboard   │  │
+│  │ • Configs   │  │ • CAF Rules  │  │ • Severity scores  │  │
+│  │ • Policies  │  │ • ALZ Rules  │  │ • MS Learn links   │  │
+│  │ • Networking│  │ • Custom     │  │ • Pillar breakdown │  │
+│  │ • RBAC      │  │   Rules      │  │ • Filters          │  │
+│  │ • Defender  │  │              │  │                    │  │
+│  │ • Monitoring│  │ Contextual:  │  │                    │  │
+│  │ • Budgets   │  │ • Stage      │  │                    │  │
+│  │             │  │ • Size       │  │                    │  │
+│  │             │  │ • Complexity │  │                    │  │
+│  └─────────────┘  └──────────────┘  └────────────────────┘  │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
@@ -207,14 +207,14 @@ The agent produces a findings report organized by severity and pillar:
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║  AZURE ENVIRONMENT ASSESSMENT REPORT                        ║
-║  Subscription: contoso-prod (abc-12345)                     ║
-║  Profile: Startup (estimated 10-20 engineers)               ║
-║  Date: 2026-03-06                                           ║
+║  AZURE ENVIRONMENT ASSESSMENT REPORT                         ║
+║  Subscription: contoso-prod (abc-12345)                      ║
+║  Profile: Startup (estimated 10-20 engineers)                ║
+║  Date: 2026-03-06                                            ║
 ╠══════════════════════════════════════════════════════════════╣
 ║                                                              ║
 ║  SUMMARY                                                     ║
-║  ● Critical: 3    ● High: 5    ● Medium: 8    ● Low: 4     ║
+║  ● Critical: 3    ● High: 5    ● Medium: 8    ● Low: 4       ║
 ║                                                              ║
 ║  CRITICAL FINDINGS                                           ║
 ║                                                              ║
@@ -227,7 +227,7 @@ The agent produces a findings report organized by severity and pillar:
 ║  [SEC-002] Defender for Cloud not enabled                    ║
 ║  Pillar: Security | Scope: Subscription                      ║
 ║  Risk: No threat detection, no secure score                  ║
-║  Fix: Enable CSPM (free) + Servers P2 (prod)                ║
+║  Fix: Enable CSPM (free) + Servers P2 (prod)                 ║
 ║  → docs.microsoft.com/azure/defender-for-cloud/...           ║
 ║                                                              ║
 ║  [OPS-001] No diagnostic settings configured                 ║
