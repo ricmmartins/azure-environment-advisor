@@ -405,18 +405,18 @@ az account show --query "{Name:name, Id:id, State:state}" -o table
 ### 3. Install Azure MCP Server
 
 ```bash
-npm install -g @azure/mcp-server
+npm install -g @azure/mcp
 ```
 
 Verify it installed correctly:
 
 ```bash
-npx @azure/mcp-server --help
+npx @azure/mcp --help
 ```
 
 > If you see usage information, the server is installed. If you see an error, check that Node.js v18+ is installed (`node --version`).
 
-> **Note:** Check the [Azure MCP Server repository](https://github.com/Azure/azure-mcp-server) for the latest package name and installation instructions. If the package name has changed, update the `"args"` in the MCP configuration (step 5) to match.
+> **Note:** Check the [Azure MCP Server documentation](https://learn.microsoft.com/azure/developer/azure-mcp-server/get-started) for the latest installation instructions. For VS Code, you can also install the [Azure MCP Server Extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server) directly.
 
 ### 4. Clone This Repository
 
@@ -450,7 +450,7 @@ Then create `.vscode/mcp.json` with this content:
   "servers": {
     "azure": {
       "command": "npx",
-      "args": ["-y", "@azure/mcp-server"],
+      "args": ["-y", "@azure/mcp@latest", "server", "start"],
       "env": {
         "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
       }
@@ -549,7 +549,7 @@ Open it in any browser (double-click the file, or right-click → "Open with" �
 |---|---|
 | `az login` opens a browser but nothing happens | Make sure you're signing in with the Azure account that has access to the target subscription. After signing in, return to the terminal — it should show "You have logged in." |
 | `az account list` shows no subscriptions | Your account may not have any subscriptions. Check with your Azure administrator, or [create a free account](https://azure.microsoft.com/free/). |
-| `npm install -g @azure/mcp-server` fails | Make sure Node.js v18+ is installed (`node --version`). On macOS/Linux you may need `sudo`. |
+| `npm install -g @azure/mcp` fails | Make sure Node.js v18+ is installed (`node --version`). On macOS/Linux you may need `sudo`. |
 | Copilot doesn't seem to connect to Azure | Verify the MCP config: check that `.vscode/mcp.json` exists, the subscription ID is correct, and you've restarted VS Code. Try `az account show` to confirm you're logged in. |
 | Copilot says "I can't access Azure" or times out | Run `az login` again — your token may have expired. Also verify `AZURE_SUBSCRIPTION_ID` in your MCP config matches the subscription from `az account show`. |
 | The report is missing findings or seems incomplete | Large subscriptions may hit Copilot's context limits. Try assessing one resource group at a time: "Assess the resources in resource group rg-production". |

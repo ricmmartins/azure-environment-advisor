@@ -52,7 +52,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Install Azure MCP Server
-        run: npm install -g @azure/mcp-server
+        run: npm install -g @azure/mcp
 
       - name: Run Assessment
         id: assess
