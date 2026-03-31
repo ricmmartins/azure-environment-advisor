@@ -2,394 +2,764 @@
 """
 Azure Environment Advisor — Trend Dashboard Generator
 
-Reads multiple assessment baseline JSON files and generates an interactive
-HTML trend dashboard showing governance scores and findings over time.
+Generates a self-contained HTML trend dashboard from multiple assessment baselines.
+Shows score trends, finding counts by severity, pillar breakdowns, and drift analysis.
 
 Usage:
-    python scripts/generate-trend-dashboard.py --baselines-dir baselines/
-    python scripts/generate-trend-dashboard.py --baselines file1.json file2.json
-    python scripts/generate-trend-dashboard.py --baselines-dir baselines/ --output trend.html
+    python scripts/generate-trend-dashboard.py --baselines-dir baselines/ --output trend-dashboard.html
+    python scripts/generate-trend-dashboard.py --baselines file1.json file2.json --output trend-dashboard.html
+
+The generated dashboard includes:
+    - Overall Score Trend (line chart)
+    - Finding Counts by Severity (stacked bar chart)
+    - Pillar Score Breakdown (table with trend arrows)
+    - New vs Resolved findings between consecutive assessments
+    - Top Recurring Findings (never fixed)
+    - Executive Summary
+    - Filter buttons for time range (Last 4, Last 8, All)
 
 Requirements:
-    - Python 3.9+
-    - No external dependencies (stdlib only)
+    - Python 3.9+ (stdlib only, no pip dependencies)
 
 Exit codes:
-    0 = dashboard generated successfully
-    1 = error occurred
+    0 = success
+    1 = error
 """
 
-import argparse
-import json
-import os
 import sys
+import json
+import argparse
 from pathlib import Path
 from datetime import datetime
 
 
-def load_baseline(path: str) -> dict:
+# --- Constants ---
+
+PILLAR_MAP = {
+    "SEC": "Security",
+    "REL": "Reliability",
+    "COST": "Cost Optimization",
+    "OPS": "Operational Excellence",
+    "PERF": "Performance",
+    "GOV": "Governance",
+}
+
+SEVERITY_LEVELS = ["Critical", "High", "Medium", "Low"]
+SEVERITY_ORDER = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1, "Informational": 0}
+
+
+# --- Helpers ---
+
+def rule_id_to_pillar(rule_id):
+    """Derive pillar name from rule ID prefix."""
+    prefix = rule_id.split("-")[0] if "-" in rule_id else ""
+    return PILLAR_MAP.get(prefix, "Other")
+
+
+def parse_date(date_str):
+    """Parse a date string, returning datetime.min on failure."""
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return datetime.min
+
+
+def format_date(date_str):
+    """Format a date string for display."""
+    dt = parse_date(date_str)
+    if dt == datetime.min:
+        return date_str or "Unknown"
+    return dt.strftime("%b %d, %Y")
+
+
+def escape_html(text):
+    """Escape HTML special characters."""
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+# --- Data Loading ---
+
+def load_baseline(path):
     """Load and validate a baseline JSON file."""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    if "metadata" not in data:
-        raise ValueError(f"Missing 'metadata' in {path}")
+    if "metadata" not in data or "findings" not in data:
+        raise ValueError(f"Invalid baseline: missing 'metadata' or 'findings' in {path}")
     return data
 
 
-def calculate_score(baseline: dict) -> float:
-    """Calculate overall score: passed / (passed + findings) * 100."""
-    findings = len(baseline.get("findings", []))
-    passed = len(baseline.get("passed", []))
-    total = findings + passed
+# --- Analysis ---
+
+def calculate_score(baseline):
+    """Calculate overall assessment score: passed / (passed + findings) * 100."""
+    findings = [f for f in baseline.get("findings", [])
+                if f.get("status", "finding") != "exception"]
+    passed = baseline.get("passed", [])
+    total = len(passed) + len(findings)
     if total == 0:
         return 100.0
-    return round((passed / total) * 100, 1)
+    return round((len(passed) / total) * 100, 1)
 
 
-def count_by_severity(findings: list) -> dict:
-    """Count findings by severity level."""
-    counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+def calculate_pillar_scores(baseline):
+    """Calculate per-pillar scores based on rule ID prefixes."""
+    findings = [f for f in baseline.get("findings", [])
+                if f.get("status", "finding") != "exception"]
+    passed = baseline.get("passed", [])
+
+    pillar_findings = {}
     for f in findings:
-        sev = f.get("severity", "Unknown").capitalize()
+        pillar = f.get("pillar", rule_id_to_pillar(f.get("rule_id", "")))
+        pillar_findings[pillar] = pillar_findings.get(pillar, 0) + 1
+
+    pillar_passed = {}
+    for rule_id in passed:
+        pillar = rule_id_to_pillar(rule_id)
+        pillar_passed[pillar] = pillar_passed.get(pillar, 0) + 1
+
+    all_pillars = sorted(set(pillar_findings.keys()) | set(pillar_passed.keys()))
+    scores = {}
+    for pillar in all_pillars:
+        p = pillar_passed.get(pillar, 0)
+        f = pillar_findings.get(pillar, 0)
+        total = p + f
+        scores[pillar] = round((p / total) * 100, 1) if total > 0 else 100.0
+    return scores
+
+
+def severity_counts(baseline):
+    """Count findings by severity level."""
+    findings = [f for f in baseline.get("findings", [])
+                if f.get("status", "finding") != "exception"]
+    counts = {s: 0 for s in SEVERITY_LEVELS}
+    for f in findings:
+        sev = f.get("severity", "Low")
         if sev in counts:
             counts[sev] += 1
     return counts
 
 
-def count_by_pillar(findings: list) -> dict:
-    """Count findings by pillar."""
-    counts = {}
-    for f in findings:
-        pillar = f.get("pillar", "Unknown")
-        counts[pillar] = counts.get(pillar, 0) + 1
-    return counts
+def diff_findings(old_baseline, new_baseline):
+    """Compute new, resolved, escalated, de-escalated findings between two baselines."""
+    old_ids = {f["rule_id"]: f for f in old_baseline.get("findings", [])
+               if f.get("status", "finding") != "exception"}
+    new_ids = {f["rule_id"]: f for f in new_baseline.get("findings", [])
+               if f.get("status", "finding") != "exception"}
+
+    result = {"new": [], "resolved": [], "escalated": [], "de_escalated": []}
+
+    for rid in sorted(set(old_ids) | set(new_ids)):
+        old = old_ids.get(rid)
+        new = new_ids.get(rid)
+        if new and not old:
+            result["new"].append(new)
+        elif old and not new:
+            result["resolved"].append(old)
+        elif old and new:
+            o = SEVERITY_ORDER.get(old.get("severity", ""), 0)
+            n = SEVERITY_ORDER.get(new.get("severity", ""), 0)
+            if n > o:
+                result["escalated"].append({
+                    "rule_id": rid, "title": new.get("title", ""),
+                    "from": old.get("severity", ""), "to": new.get("severity", ""),
+                })
+            elif n < o:
+                result["de_escalated"].append({
+                    "rule_id": rid, "title": new.get("title", ""),
+                    "from": old.get("severity", ""), "to": new.get("severity", ""),
+                })
+
+    return result
 
 
-def get_recurring_findings(baselines: list[dict]) -> list[str]:
-    """Find rule IDs that appear in every assessment."""
+def find_recurring_findings(baselines):
+    """Find findings present in every single assessment."""
     if len(baselines) < 2:
         return []
-    all_rule_sets = []
+    finding_sets = []
     for b in baselines:
-        rules = {f.get("rule_id") for f in b.get("findings", []) if f.get("rule_id")}
-        all_rule_sets.append(rules)
-    recurring = all_rule_sets[0]
-    for rs in all_rule_sets[1:]:
-        recurring = recurring & rs
-    return sorted(recurring)
+        ids = {f["rule_id"] for f in b.get("findings", [])
+               if f.get("status", "finding") != "exception"}
+        finding_sets.append(ids)
+
+    recurring = finding_sets[0]
+    for s in finding_sets[1:]:
+        recurring = recurring & s
+
+    latest = baselines[-1]
+    result = []
+    for f in latest.get("findings", []):
+        if f["rule_id"] in recurring:
+            result.append(f)
+    return sorted(result, key=lambda x: SEVERITY_ORDER.get(x.get("severity", ""), 0), reverse=True)
 
 
-def compute_changes(prev: dict, curr: dict) -> dict:
-    """Compute new/resolved between two consecutive baselines."""
-    prev_rules = {f.get("rule_id") for f in prev.get("findings", [])}
-    curr_rules = {f.get("rule_id") for f in curr.get("findings", [])}
-    return {
-        "new": len(curr_rules - prev_rules),
-        "resolved": len(prev_rules - curr_rules),
-    }
+# --- HTML Generation ---
 
+def generate_html(data):
+    """Generate the complete self-contained HTML dashboard."""
+    data_json = json.dumps(data, indent=None, ensure_ascii=False)
+    subscription = escape_html(data.get("subscription", "Unknown"))
+    profile = escape_html(data.get("profile", ""))
+    n = len(data["assessments"])
+    title = f"Trend Dashboard — {subscription}"
+    profile_text = f" — Profile: {profile.title()}" if profile else ""
 
-def generate_svg_line_chart(data_points: list[tuple], width=600, height=200) -> str:
-    """Generate an SVG line chart. data_points = [(label, value), ...]"""
-    if not data_points:
-        return ""
-    values = [v for _, v in data_points]
-    min_v = max(0, min(values) - 10)
-    max_v = min(100, max(values) + 10)
-    v_range = max_v - min_v if max_v != min_v else 1
-
-    pad_x, pad_y = 50, 20
-    chart_w = width - pad_x * 2
-    chart_h = height - pad_y * 2
-
-    points = []
-    labels_svg = []
-    dots_svg = []
-    for i, (label, val) in enumerate(data_points):
-        x = pad_x + (i / max(len(data_points) - 1, 1)) * chart_w
-        y = pad_y + chart_h - ((val - min_v) / v_range) * chart_h
-        points.append(f"{x:.1f},{y:.1f}")
-        dots_svg.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="var(--accent)"/>')
-        dots_svg.append(f'<text x="{x:.1f}" y="{y:.1f}-12" text-anchor="middle" fill="var(--text-secondary)" font-size="11">{val}</text>')
-        labels_svg.append(f'<text x="{x:.1f}" y="{height - 2}" text-anchor="middle" fill="var(--text-secondary)" font-size="10">{label}</text>')
-
-    polyline = f'<polyline points="{" ".join(points)}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
-
-    # Y-axis labels
-    y_labels = []
-    for i in range(5):
-        val = min_v + (v_range * i / 4)
-        y = pad_y + chart_h - (i / 4) * chart_h
-        y_labels.append(f'<text x="{pad_x - 8}" y="{y:.1f}" text-anchor="end" fill="var(--text-secondary)" font-size="10" dominant-baseline="middle">{val:.0f}</text>')
-        y_labels.append(f'<line x1="{pad_x}" y1="{y:.1f}" x2="{width - pad_x}" y2="{y:.1f}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/>')
-
-    return f'''<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:{width}px;">
-    {"".join(y_labels)}
-    {polyline}
-    {"".join(dots_svg)}
-    {"".join(labels_svg)}
-  </svg>'''
-
-
-def generate_svg_bar_chart(data: list[dict], width=600, height=220) -> str:
-    """Generate stacked bar chart. data = [{label, critical, high, medium, low}, ...]"""
-    if not data:
-        return ""
-    max_total = max(sum(d.get(s, 0) for s in ["critical", "high", "medium", "low"]) for d in data)
-    if max_total == 0:
-        max_total = 1
-
-    pad_x, pad_y = 50, 20
-    chart_w = width - pad_x * 2
-    chart_h = height - pad_y * 2 - 20
-    bar_w = min(40, chart_w / len(data) * 0.6)
-    gap = chart_w / len(data)
-
-    colors = {"critical": "#b60205", "high": "#d93f0b", "medium": "#f9d0c4", "low": "#c5def5"}
-    bars = []
-
-    for i, d in enumerate(data):
-        x = pad_x + gap * i + (gap - bar_w) / 2
-        y_offset = pad_y + chart_h
-        for sev in ["low", "medium", "high", "critical"]:
-            val = d.get(sev, 0)
-            h = (val / max_total) * chart_h
-            y_offset -= h
-            if val > 0:
-                bars.append(f'<rect x="{x:.1f}" y="{y_offset:.1f}" width="{bar_w:.1f}" height="{h:.1f}" fill="{colors[sev]}" rx="2"><title>{sev.capitalize()}: {val}</title></rect>')
-        bars.append(f'<text x="{x + bar_w/2:.1f}" y="{pad_y + chart_h + 15}" text-anchor="middle" fill="var(--text-secondary)" font-size="10">{d["label"]}</text>')
-
-    legend = []
-    lx = pad_x
-    for sev, color in [("Critical", "#b60205"), ("High", "#d93f0b"), ("Medium", "#f9d0c4"), ("Low", "#c5def5")]:
-        legend.append(f'<rect x="{lx}" y="2" width="10" height="10" fill="{color}" rx="2"/>')
-        legend.append(f'<text x="{lx + 14}" y="11" fill="var(--text-secondary)" font-size="10">{sev}</text>')
-        lx += 70
-
-    return f'''<svg viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:{width}px;">
-    {"".join(legend)}
-    {"".join(bars)}
-  </svg>'''
-
-
-def generate_html(baselines: list[dict], output_path: str):
-    """Generate the trend dashboard HTML."""
-    # Sort by date
-    baselines.sort(key=lambda b: b.get("metadata", {}).get("date", ""))
-
-    dates = [b["metadata"].get("date", "?") for b in baselines]
-    scores = [calculate_score(b) for b in baselines]
-    severity_data = []
-    pillar_data = []
-    changes = []
-
-    for i, b in enumerate(baselines):
-        findings = b.get("findings", [])
-        sev = count_by_severity(findings)
-        severity_data.append({
-            "label": dates[i][-5:],  # MM-DD
-            "critical": sev["Critical"],
-            "high": sev["High"],
-            "medium": sev["Medium"],
-            "low": sev["Low"],
-        })
-        pillar_data.append(count_by_pillar(findings))
-        if i > 0:
-            changes.append(compute_changes(baselines[i-1], b))
-
-    recurring = get_recurring_findings(baselines)
-    score_trend = "improving" if len(scores) > 1 and scores[-1] > scores[0] else "declining" if len(scores) > 1 and scores[-1] < scores[0] else "stable"
-    total_resolved = sum(c["resolved"] for c in changes)
-    total_new = sum(c["new"] for c in changes)
-
-    # Build score chart
-    score_points = [(d[-5:], s) for d, s in zip(dates, scores)]
-    score_chart = generate_svg_line_chart(score_points)
-    bar_chart = generate_svg_bar_chart(severity_data)
-
-    # Pillar trend table
-    all_pillars = sorted(set(p for pd in pillar_data for p in pd))
-    pillar_rows = ""
-    for pillar in all_pillars:
-        cells = ""
-        prev = None
-        for pd in pillar_data:
-            val = pd.get(pillar, 0)
-            arrow = ""
-            if prev is not None:
-                if val < prev:
-                    arrow = ' <span style="color:#28a745">▼</span>'
-                elif val > prev:
-                    arrow = ' <span style="color:#d73a4a">▲</span>'
-            cells += f"<td>{val}{arrow}</td>"
-            prev = val
-        pillar_rows += f"<tr><td><strong>{pillar}</strong></td>{cells}</tr>"
-
-    # Changes table
-    changes_rows = ""
-    for i, c in enumerate(changes):
-        changes_rows += f"<tr><td>{dates[i]} → {dates[i+1]}</td><td style='color:#d73a4a'>+{c['new']}</td><td style='color:#28a745'>-{c['resolved']}</td></tr>"
-
-    # Recurring findings
-    recurring_html = ""
-    if recurring:
-        recurring_html = "<ul>" + "".join(f"<li><code>{r}</code></li>" for r in recurring) + "</ul>"
-    else:
-        recurring_html = "<p style='color:var(--text-secondary)'>No findings appear in every assessment — great progress! 🎉</p>"
-
-    # Executive summary
-    exec_summary = f"""Over <strong>{len(baselines)} assessments</strong> ({dates[0]} → {dates[-1]}),
-    your governance score {"improved" if score_trend == "improving" else "declined" if score_trend == "declining" else "remained stable"}
-    from <strong>{scores[0]}</strong> to <strong>{scores[-1]}</strong>.
-    {total_resolved} findings were resolved and {total_new} new findings appeared.""" if len(baselines) > 1 else f"Single assessment on {dates[0]} with a score of {scores[0]}."
-
-    html = f"""<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Azure Environment Advisor — Trend Dashboard</title>
+<title>{title}</title>
 <style>
   :root {{
-    --bg: #ffffff; --card-bg: #f6f8fa; --text: #1f2328; --text-secondary: #656d76;
-    --border: #d0d7de; --accent: #0969da; --green: #28a745; --red: #d73a4a;
+    --critical: #d13438;
+    --high: #e97548;
+    --medium: #eaa300;
+    --low: #0078d4;
+    --pass: #107c10;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #242424;
+    --text-secondary: #616161;
+    --border: #e0e0e0;
+    --hover: #f5f5f5;
+    --accent: #0078d4;
+    --improving: #107c10;
+    --declining: #d13438;
+    --stable: #616161;
   }}
   @media (prefers-color-scheme: dark) {{
     :root {{
-      --bg: #0d1117; --card-bg: #161b22; --text: #e6edf3; --text-secondary: #8b949e;
-      --border: #30363d; --accent: #58a6ff; --green: #3fb950; --red: #f85149;
+      --bg: #1a1a1a;
+      --card: #2d2d2d;
+      --text: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --border: #404040;
+      --hover: #333333;
     }}
   }}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 900px; margin: 0 auto; }}
-  h1 {{ font-size: 1.8rem; margin-bottom: 0.5rem; }}
-  h2 {{ font-size: 1.3rem; margin: 1.5rem 0 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }}
-  .card {{ background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; margin-bottom: 1rem; }}
-  .summary {{ font-size: 1.05rem; line-height: 1.6; }}
-  .score-big {{ font-size: 3rem; font-weight: 700; color: var(--accent); }}
-  .score-label {{ font-size: 0.9rem; color: var(--text-secondary); }}
-  .metrics {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }}
-  .metric {{ text-align: center; }}
-  .metric-value {{ font-size: 1.8rem; font-weight: 700; }}
-  .metric-label {{ font-size: 0.8rem; color: var(--text-secondary); }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 0.9rem; }}
-  th, td {{ padding: 0.5rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }}
-  th {{ font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }}
-  code {{ background: var(--card-bg); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.85rem; }}
-  .footer {{ margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.85rem; text-align: center; }}
-  a {{ color: var(--accent); text-decoration: none; }}
+  body {{ font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }}
+
+  .header {{ background: linear-gradient(135deg, #0078d4, #005a9e); color: white; padding: 2rem 2rem 1.5rem; }}
+  .header h1 {{ font-size: 1.75rem; font-weight: 600; margin-bottom: 0.25rem; }}
+  .header .subtitle {{ opacity: 0.85; font-size: 0.95rem; }}
+  .header .meta {{ display: flex; gap: 2rem; margin-top: 1rem; font-size: 0.85rem; opacity: 0.8; flex-wrap: wrap; }}
+  .header .meta span {{ display: flex; align-items: center; gap: 0.35rem; }}
+
+  .filters {{ padding: 1rem 2rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }}
+  .filters label {{ font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem; }}
+  .filter-btn {{ padding: 0.35rem 0.85rem; border-radius: 20px; border: 1px solid var(--border); background: var(--card); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; color: var(--text); }}
+  .filter-btn:hover {{ background: var(--hover); }}
+  .filter-btn.active {{ background: #0078d4; color: white; border-color: #0078d4; }}
+
+  .section {{ padding: 1.5rem 2rem; }}
+  .section h2 {{ font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }}
+  .card {{ background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 1rem; }}
+
+  .summary-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; padding: 1.5rem 2rem; margin-top: -1rem; }}
+  .summary-card {{ background: var(--card); border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--border); }}
+  .summary-card .count {{ font-size: 2rem; font-weight: 700; }}
+  .summary-card .label {{ font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }}
+
+  .executive {{ background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--accent); font-size: 0.95rem; line-height: 1.7; }}
+  .executive .trend-up {{ color: var(--improving); font-weight: 600; }}
+  .executive .trend-down {{ color: var(--declining); font-weight: 600; }}
+
+  .chart-container {{ background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow-x: auto; }}
+  .chart-container svg {{ display: block; margin: 0 auto; }}
+
+  .pillar-table {{ width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }}
+  .pillar-table th, .pillar-table td {{ padding: 0.75rem 1rem; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.85rem; }}
+  .pillar-table th {{ background: var(--hover); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.03em; color: var(--text-secondary); }}
+  .pillar-table th:first-child, .pillar-table td:first-child {{ text-align: left; font-weight: 600; }}
+  .pillar-table tr:last-child td {{ border-bottom: none; }}
+  .trend-arrow {{ font-size: 0.8rem; margin-left: 0.25rem; }}
+  .trend-arrow.up {{ color: var(--improving); }}
+  .trend-arrow.down {{ color: var(--declining); }}
+
+  .diff-section {{ margin-bottom: 1.5rem; }}
+  .diff-section h3 {{ font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }}
+  .diff-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; }}
+  .diff-stat {{ text-align: center; padding: 0.75rem; background: var(--hover); border-radius: 8px; }}
+  .diff-stat .num {{ font-size: 1.5rem; font-weight: 700; }}
+  .diff-stat .lbl {{ font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }}
+
+  .finding-item {{ display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }}
+  .finding-item:last-child {{ border-bottom: none; }}
+  .sev-badge {{ padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: white; white-space: nowrap; }}
+  .sev-badge.critical {{ background: var(--critical); }}
+  .sev-badge.high {{ background: var(--high); }}
+  .sev-badge.medium {{ background: var(--medium); }}
+  .sev-badge.low {{ background: var(--low); }}
+  .finding-text {{ font-size: 0.85rem; }}
+  .finding-rule {{ font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.5rem; font-weight: 600; }}
+
+  .empty-state {{ text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 0.9rem; }}
+
+  .footer {{ padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 1rem; }}
+  .footer a {{ color: #0078d4; text-decoration: none; }}
+
+  @media print {{
+    .filters {{ display: none !important; }}
+    body {{ background: white; }}
+    .card, .chart-container, .executive {{ box-shadow: none; border: 1px solid #ddd; }}
+  }}
+  @media (max-width: 600px) {{
+    .section {{ padding: 1rem; }}
+    .header {{ padding: 1.5rem 1rem 1rem; }}
+    .summary-grid {{ padding: 1rem; }}
+    .filters {{ padding: 0.75rem 1rem; }}
+  }}
 </style>
 </head>
 <body>
 
-<h1>📈 Governance Trend Dashboard</h1>
-<p style="color:var(--text-secondary)">Azure Environment Advisor — {dates[0]} to {dates[-1]} ({len(baselines)} assessments)</p>
-
-<div class="card summary">
-  <p>{exec_summary}</p>
-</div>
-
-<div class="metrics">
-  <div class="metric">
-    <div class="metric-value" style="color:var(--accent)">{scores[-1]}</div>
-    <div class="metric-label">Current Score</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value">{len(baselines[-1].get("findings", []))}</div>
-    <div class="metric-label">Open Findings</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value" style="color:var(--green)">{total_resolved}</div>
-    <div class="metric-label">Total Resolved</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value" style="color:var(--red)">{len(recurring)}</div>
-    <div class="metric-label">Recurring</div>
+<div class="header">
+  <h1>\\U0001f4c8 Azure Environment Trend Dashboard</h1>
+  <div class="subtitle">{subscription}{profile_text}</div>
+  <div class="meta">
+    <span>\\U0001f4ca {n} assessment{"s" if n != 1 else ""} analyzed</span>
+    <span id="meta-range"></span>
   </div>
 </div>
 
-<h2>Score Trend</h2>
-<div class="card">{score_chart}</div>
-
-<h2>Findings by Severity</h2>
-<div class="card">{bar_chart}</div>
-
-<h2>Pillar Breakdown</h2>
-<div class="card">
-  <table>
-    <tr><th>Pillar</th>{"".join(f"<th>{d[-5:]}</th>" for d in dates)}</tr>
-    {pillar_rows}
-  </table>
+<div class="filters">
+  <label>Time range:</label>
+  <button class="filter-btn active" onclick="applyFilter('all')">All</button>
+  <button class="filter-btn" onclick="applyFilter(8)">Last 8</button>
+  <button class="filter-btn" onclick="applyFilter(4)">Last 4</button>
 </div>
 
-<h2>New vs Resolved</h2>
-<div class="card">
-  <table>
-    <tr><th>Period</th><th>🆕 New</th><th>✅ Resolved</th></tr>
-    {changes_rows if changes_rows else "<tr><td colspan='3' style='color:var(--text-secondary)'>Need at least 2 assessments to show changes</td></tr>"}
-  </table>
+<div id="executive-section" class="section">
+  <h2>\\U0001f4cb Executive Summary</h2>
+  <div id="executive" class="executive"></div>
 </div>
 
-<h2>Recurring Findings</h2>
-<div class="card">
-  <p style="color:var(--text-secondary); margin-bottom:0.5rem;">Findings present in every assessment (never fixed):</p>
-  {recurring_html}
+<div class="section">
+  <h2>\\U0001f4c8 Overall Score Trend</h2>
+  <div id="score-chart" class="chart-container"></div>
+</div>
+
+<div class="section">
+  <h2>\\U0001f4ca Finding Counts by Severity</h2>
+  <div id="bar-chart" class="chart-container"></div>
+</div>
+
+<div class="section">
+  <h2>\\U0001f3db\\ufe0f Pillar Score Breakdown</h2>
+  <div id="pillar-table"></div>
+</div>
+
+<div class="section">
+  <h2>\\U0001f504 New vs Resolved</h2>
+  <div id="new-resolved"></div>
+</div>
+
+<div class="section">
+  <h2>\\U0001f501 Top Recurring Findings</h2>
+  <div id="recurring"></div>
 </div>
 
 <div class="footer">
-  <p>Generated by <strong>Azure Environment Advisor</strong> · <a href="https://github.com/ricmmartins/azure-environment-advisor">GitHub</a></p>
-  <p>Dashboard generated {datetime.now().strftime("%Y-%m-%d %H:%M")} from {len(baselines)} baseline files</p>
+  Generated by <a href="#">Azure Environment Advisor</a> — Trend Dashboard
 </div>
 
+<script>
+var DATA = {data_json};
+
+var currentFilter = 'all';
+
+function getFiltered(range) {{
+  var a = DATA.assessments;
+  if (range === 'all' || a.length <= range) return {{ assessments: a, diffs: DATA.diffs, offset: 0 }};
+  var offset = a.length - range;
+  return {{
+    assessments: a.slice(offset),
+    diffs: DATA.diffs.slice(Math.max(0, offset - 1)),
+    offset: offset
+  }};
+}}
+
+function applyFilter(range) {{
+  currentFilter = range;
+  document.querySelectorAll('.filter-btn').forEach(function(b) {{
+    b.classList.toggle('active',
+      (range === 'all' && b.textContent.trim() === 'All') ||
+      (range === 8 && b.textContent.trim() === 'Last 8') ||
+      (range === 4 && b.textContent.trim() === 'Last 4'));
+  }});
+  renderAll();
+}}
+
+function renderAll() {{
+  var f = getFiltered(currentFilter);
+  renderMeta(f.assessments);
+  renderExecutive(f.assessments, f.diffs);
+  renderLineChart(f.assessments);
+  renderBarChart(f.assessments);
+  renderPillarTable(f.assessments);
+  renderNewResolved(f.diffs);
+  renderRecurring();
+}}
+
+function renderMeta(assessments) {{
+  var el = document.getElementById('meta-range');
+  if (assessments.length >= 2) {{
+    el.textContent = '\\U0001f4c5 ' + assessments[0].dateLabel + ' \\u2192 ' + assessments[assessments.length - 1].dateLabel;
+  }} else if (assessments.length === 1) {{
+    el.textContent = '\\U0001f4c5 ' + assessments[0].dateLabel;
+  }}
+}}
+
+function renderExecutive(assessments, diffs) {{
+  var el = document.getElementById('executive');
+  var n = assessments.length;
+  if (n === 0) {{ el.innerHTML = '<p class="empty-state">No assessment data available.</p>'; return; }}
+  if (n === 1) {{
+    var a = assessments[0];
+    var total = a.findingCount + a.passedCount;
+    el.innerHTML = '<p>Single assessment on <strong>' + a.dateLabel + '</strong>. ' +
+      'Score: <strong>' + a.score.toFixed(1) + '%</strong> with ' +
+      a.findingCount + ' finding' + (a.findingCount !== 1 ? 's' : '') + ' across ' + total + ' checks. ' +
+      'Add more assessments to see trends.</p>';
+    return;
+  }}
+  var first = assessments[0], last = assessments[n - 1];
+  var diff = last.score - first.score;
+  var trend = diff > 2 ? 'improved' : diff < -2 ? 'declined' : 'remained stable';
+  var cls = diff > 2 ? 'trend-up' : diff < -2 ? 'trend-down' : '';
+  var totalNew = 0, totalResolved = 0;
+  diffs.forEach(function(d) {{ totalNew += d['new'].length; totalResolved += d.resolved.length; }});
+  el.innerHTML = '<p>Over <strong>' + n + ' assessments</strong> (' + first.dateLabel + ' \\u2192 ' + last.dateLabel + '), ' +
+    'your score <span class="' + cls + '">' + trend + ' from ' + first.score.toFixed(1) + '% to ' + last.score.toFixed(1) + '%</span>. ' +
+    totalResolved + ' finding' + (totalResolved !== 1 ? 's were' : ' was') + ' resolved and ' +
+    totalNew + ' new finding' + (totalNew !== 1 ? 's' : '') + ' appeared.' +
+    (last.severityCounts.Critical > 0 ? ' <strong style="color:var(--critical)">' + last.severityCounts.Critical + ' critical finding' + (last.severityCounts.Critical !== 1 ? 's' : '') + ' remain.</strong>' : '') +
+    '</p>';
+}}
+
+function renderLineChart(assessments) {{
+  var el = document.getElementById('score-chart');
+  var n = assessments.length;
+  if (n === 0) {{ el.innerHTML = '<p class="empty-state">No data.</p>'; return; }}
+
+  var W = 700, H = 280;
+  var pL = 55, pR = 20, pT = 30, pB = 50;
+  var cW = W - pL - pR, cH = H - pT - pB;
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;">';
+  svg += '<defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">';
+  svg += '<stop offset="0%" stop-color="#0078d4" stop-opacity="0.15"/>';
+  svg += '<stop offset="100%" stop-color="#0078d4" stop-opacity="0.01"/>';
+  svg += '</linearGradient></defs>';
+
+  for (var pct = 0; pct <= 100; pct += 25) {{
+    var gy = pT + cH - (pct / 100) * cH;
+    svg += '<line x1="' + pL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - pR) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4"/>';
+    svg += '<text x="' + (pL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" fill="var(--text-secondary)" font-size="11">' + pct + '</text>';
+  }}
+
+  var pts = assessments.map(function(a, i) {{
+    return {{
+      x: n > 1 ? pL + i * cW / (n - 1) : pL + cW / 2,
+      y: pT + cH - (a.score / 100) * cH,
+      score: a.score,
+      label: a.dateLabel
+    }};
+  }});
+
+  if (n > 1) {{
+    var area = 'M ' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+    for (var i = 1; i < pts.length; i++) area += ' L ' + pts[i].x.toFixed(1) + ',' + pts[i].y.toFixed(1);
+    area += ' L ' + pts[pts.length - 1].x.toFixed(1) + ',' + (pT + cH) + ' L ' + pts[0].x.toFixed(1) + ',' + (pT + cH) + ' Z';
+    svg += '<path d="' + area + '" fill="url(#lg)"/>';
+    var line = 'M ' + pts.map(function(p) {{ return p.x.toFixed(1) + ',' + p.y.toFixed(1); }}).join(' L ');
+    svg += '<path d="' + line + '" fill="none" stroke="#0078d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  }}
+
+  pts.forEach(function(p) {{
+    svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="#0078d4" stroke="var(--card)" stroke-width="2"/>';
+    svg += '<text x="' + p.x.toFixed(1) + '" y="' + (p.y - 12).toFixed(1) + '" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="600">' + p.score.toFixed(1) + '%</text>';
+    svg += '<text x="' + p.x.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--text-secondary)" font-size="10">' + p.label + '</text>';
+  }});
+
+  svg += '</svg>';
+  el.innerHTML = svg;
+}}
+
+function renderBarChart(assessments) {{
+  var el = document.getElementById('bar-chart');
+  var n = assessments.length;
+  if (n === 0) {{ el.innerHTML = '<p class="empty-state">No data.</p>'; return; }}
+
+  var W = 700, H = 300;
+  var pL = 55, pR = 20, pT = 35, pB = 50;
+  var cW = W - pL - pR, cH = H - pT - pB;
+
+  var sevOrder = ['Critical', 'High', 'Medium', 'Low'];
+  var sevColors = {{ Critical: 'var(--critical)', High: 'var(--high)', Medium: 'var(--medium)', Low: 'var(--low)' }};
+
+  var maxTotal = 1;
+  assessments.forEach(function(a) {{
+    var t = sevOrder.reduce(function(s, k) {{ return s + (a.severityCounts[k] || 0); }}, 0);
+    if (t > maxTotal) maxTotal = t;
+  }});
+  var niceMax = Math.ceil(maxTotal / 5) * 5;
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;">';
+
+  var lx = pL;
+  sevOrder.forEach(function(sev) {{
+    svg += '<rect x="' + lx + '" y="8" width="12" height="12" rx="2" fill="' + sevColors[sev] + '"/>';
+    svg += '<text x="' + (lx + 16) + '" y="18" fill="var(--text-secondary)" font-size="10">' + sev + '</text>';
+    lx += sev.length * 6.5 + 28;
+  }});
+
+  for (var frac = 0; frac <= 1.001; frac += 0.25) {{
+    var gy = pT + cH - frac * cH;
+    var val = Math.round(niceMax * frac);
+    svg += '<line x1="' + pL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - pR) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"' + (frac > 0 ? ' stroke-dasharray="4,4"' : '') + '/>';
+    svg += '<text x="' + (pL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" fill="var(--text-secondary)" font-size="11">' + val + '</text>';
+  }}
+
+  var barW = Math.min(60, (cW - 20) / n - 10);
+  assessments.forEach(function(a, i) {{
+    var cx = pL + (i + 0.5) * cW / n;
+    var bx = cx - barW / 2;
+    var yOff = 0;
+    var total = 0;
+    sevOrder.forEach(function(sev) {{
+      var count = a.severityCounts[sev] || 0;
+      total += count;
+      if (count === 0) return;
+      var bh = (count / niceMax) * cH;
+      var by = pT + cH - yOff - bh;
+      svg += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + sevColors[sev] + '"/>';
+      if (bh > 14) svg += '<text x="' + cx.toFixed(1) + '" y="' + (by + bh / 2 + 4).toFixed(1) + '" text-anchor="middle" fill="white" font-size="10" font-weight="600">' + count + '</text>';
+      yOff += bh;
+    }});
+    svg += '<text x="' + cx.toFixed(1) + '" y="' + (pT + cH - yOff - 6).toFixed(1) + '" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600">' + total + '</text>';
+    svg += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--text-secondary)" font-size="10">' + a.dateLabel + '</text>';
+  }});
+
+  svg += '</svg>';
+  el.innerHTML = svg;
+}}
+
+function renderPillarTable(assessments) {{
+  var el = document.getElementById('pillar-table');
+  var n = assessments.length;
+  if (n === 0) {{ el.innerHTML = '<p class="empty-state">No data.</p>'; return; }}
+
+  var allPillars = {{}};
+  assessments.forEach(function(a) {{ Object.keys(a.pillarScores).forEach(function(p) {{ allPillars[p] = true; }}); }});
+  var pillars = Object.keys(allPillars).sort();
+
+  var html = '<table class="pillar-table"><thead><tr><th>Pillar</th>';
+  assessments.forEach(function(a) {{ html += '<th>' + a.dateLabel + '</th>'; }});
+  html += '<th>Trend</th></tr></thead><tbody>';
+
+  pillars.forEach(function(pillar) {{
+    html += '<tr><td>' + pillar + '</td>';
+    var scores = assessments.map(function(a) {{ return a.pillarScores[pillar] !== undefined ? a.pillarScores[pillar] : null; }});
+    scores.forEach(function(s) {{
+      if (s === null) {{ html += '<td>\\u2014</td>'; return; }}
+      var color = s >= 80 ? 'var(--pass)' : s >= 60 ? 'var(--medium)' : s >= 40 ? 'var(--high)' : 'var(--critical)';
+      html += '<td style="color:' + color + ';font-weight:600">' + s.toFixed(1) + '%</td>';
+    }});
+    var valid = scores.filter(function(s) {{ return s !== null; }});
+    if (valid.length >= 2) {{
+      var diff = valid[valid.length - 1] - valid[0];
+      if (diff > 2) html += '<td><span class="trend-arrow up">\\u25b2 +' + diff.toFixed(1) + '</span></td>';
+      else if (diff < -2) html += '<td><span class="trend-arrow down">\\u25bc ' + diff.toFixed(1) + '</span></td>';
+      else html += '<td><span class="trend-arrow" style="color:var(--stable)">\\u2014 stable</span></td>';
+    }} else html += '<td>\\u2014</td>';
+    html += '</tr>';
+  }});
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}}
+
+function renderNewResolved(diffs) {{
+  var el = document.getElementById('new-resolved');
+  if (!diffs || diffs.length === 0) {{
+    el.innerHTML = '<div class="card"><p class="empty-state">Need at least 2 assessments to compare.</p></div>';
+    return;
+  }}
+  var html = '';
+  diffs.forEach(function(d) {{
+    html += '<div class="card diff-section">';
+    html += '<h3>' + d.fromDate + ' \\u2192 ' + d.toDate + '</h3>';
+    html += '<div class="diff-grid">';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--critical)">' + d['new'].length + '</div><div class="lbl">New</div></div>';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--pass)">' + d.resolved.length + '</div><div class="lbl">Resolved</div></div>';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--high)">' + d.escalated.length + '</div><div class="lbl">Escalated</div></div>';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--low)">' + d.deEscalated.length + '</div><div class="lbl">De-escalated</div></div>';
+    html += '</div>';
+
+    if (d['new'].length > 0) {{
+      html += '<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">NEW FINDINGS:</strong></div>';
+      d['new'].forEach(function(f) {{
+        var cls = f.severity ? f.severity.toLowerCase() : 'low';
+        html += '<div class="finding-item"><span class="sev-badge ' + cls + '">' + (f.severity || '') + '</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + '</span></div>';
+      }});
+    }}
+    if (d.resolved.length > 0) {{
+      html += '<div style="margin-top:0.75rem;margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">RESOLVED:</strong></div>';
+      d.resolved.forEach(function(f) {{
+        html += '<div class="finding-item"><span style="color:var(--pass);font-weight:600;font-size:0.85rem">\\u2713</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + '</span></div>';
+      }});
+    }}
+    if (d.escalated.length > 0) {{
+      html += '<div style="margin-top:0.75rem;margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">ESCALATED:</strong></div>';
+      d.escalated.forEach(function(f) {{
+        html += '<div class="finding-item"><span style="color:var(--high);font-weight:600;font-size:0.85rem">\\u2b06</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + ' (' + f.from + ' \\u2192 ' + f.to + ')</span></div>';
+      }});
+    }}
+    if (d.deEscalated.length > 0) {{
+      html += '<div style="margin-top:0.75rem;margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">DE-ESCALATED:</strong></div>';
+      d.deEscalated.forEach(function(f) {{
+        html += '<div class="finding-item"><span style="color:var(--pass);font-weight:600;font-size:0.85rem">\\u2b07</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + ' (' + f.from + ' \\u2192 ' + f.to + ')</span></div>';
+      }});
+    }}
+    html += '</div>';
+  }});
+  el.innerHTML = html;
+}}
+
+function renderRecurring() {{
+  var el = document.getElementById('recurring');
+  var r = DATA.recurring;
+  if (!r || r.length === 0) {{
+    el.innerHTML = '<div class="card"><p class="empty-state">No findings appear in every assessment. Great improvement! \\U0001f389</p></div>';
+    return;
+  }}
+  var html = '<div class="card"><p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem;">These findings have appeared in <strong>every</strong> assessment and have never been resolved:</p>';
+  r.forEach(function(f) {{
+    var cls = f.severity ? f.severity.toLowerCase() : 'low';
+    html += '<div class="finding-item"><span class="sev-badge ' + cls + '">' + (f.severity || '') + '</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + '</span><span style="font-size:0.75rem;color:var(--text-secondary);margin-left:auto">' + (f.pillar || '') + '</span></div>';
+  }});
+  html += '</div>';
+  el.innerHTML = html;
+}}
+
+renderAll();
+</script>
 </body>
 </html>"""
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(f"Trend dashboard saved to: {output_path}")
 
+# --- Main ---
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate trend dashboard from assessment baselines")
-    parser.add_argument("--baselines-dir", help="Directory containing baseline JSON files")
-    parser.add_argument("--baselines", nargs="+", help="Explicit list of baseline JSON files")
-    parser.add_argument("--output", default="trend-dashboard.html", help="Output HTML file (default: trend-dashboard.html)")
+    parser = argparse.ArgumentParser(
+        description="Generate a self-contained HTML trend dashboard from multiple assessment baselines",
+        epilog="Example: python scripts/generate-trend-dashboard.py --baselines-dir baselines/ --output trend-dashboard.html",
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--baselines-dir",
+                       help="Directory containing baseline JSON files")
+    group.add_argument("--baselines", nargs="+",
+                       help="Explicit list of baseline JSON files")
+    parser.add_argument("--output", default="trend-dashboard.html",
+                        help="Output HTML file path (default: trend-dashboard.html)")
     args = parser.parse_args()
 
-    if not args.baselines_dir and not args.baselines:
-        print("Error: Provide --baselines-dir or --baselines", file=sys.stderr)
-        sys.exit(1)
-
-    # Collect baseline files
-    files = []
-    if args.baselines:
-        files = args.baselines
-    elif args.baselines_dir:
-        baselines_dir = Path(args.baselines_dir)
-        if not baselines_dir.exists():
-            print(f"Error: Directory not found: {baselines_dir}", file=sys.stderr)
+    # Discover baseline files
+    if args.baselines_dir:
+        baseline_dir = Path(args.baselines_dir)
+        if not baseline_dir.is_dir():
+            print(f"Error: '{args.baselines_dir}' is not a directory", file=sys.stderr)
             sys.exit(1)
-        files = sorted(str(p) for p in baselines_dir.glob("baseline-*.json"))
+        files = sorted(baseline_dir.glob("*.json"))
+        files = [f for f in files if "schema" not in f.name.lower()]
+    else:
+        files = [Path(f) for f in args.baselines]
 
     if not files:
-        print("No baseline files found.")
+        print("Error: No baseline files found", file=sys.stderr)
         sys.exit(1)
 
     # Load baselines
     baselines = []
     for f in files:
         try:
-            b = load_baseline(f)
-            baselines.append(b)
+            data = load_baseline(f)
+            baselines.append(data)
         except Exception as e:
             print(f"Warning: Skipping {f}: {e}", file=sys.stderr)
 
     if not baselines:
-        print("Error: No valid baselines loaded.", file=sys.stderr)
+        print("Error: No valid baseline files loaded", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Loaded {len(baselines)} baselines")
-    generate_html(baselines, args.output)
+    # Sort by date
+    baselines.sort(key=lambda b: parse_date(b["metadata"].get("date", "")))
+
+    # Build assessment data
+    assessments = []
+    for b in baselines:
+        findings = [f for f in b.get("findings", [])
+                    if f.get("status", "finding") != "exception"]
+        passed = b.get("passed", [])
+        date_str = b["metadata"].get("date", "")
+        assessments.append({
+            "date": date_str,
+            "dateLabel": format_date(date_str),
+            "score": calculate_score(b),
+            "findingCount": len(findings),
+            "passedCount": len(passed),
+            "severityCounts": severity_counts(b),
+            "pillarScores": calculate_pillar_scores(b),
+        })
+
+    # Build pairwise diffs
+    diffs = []
+    for i in range(1, len(baselines)):
+        d = diff_findings(baselines[i - 1], baselines[i])
+        diffs.append({
+            "fromDate": assessments[i - 1]["dateLabel"],
+            "toDate": assessments[i]["dateLabel"],
+            "new": [{"rule_id": f["rule_id"], "title": f.get("title", ""),
+                     "severity": f.get("severity", "")} for f in d["new"]],
+            "resolved": [{"rule_id": f["rule_id"], "title": f.get("title", ""),
+                         "severity": f.get("severity", "")} for f in d["resolved"]],
+            "escalated": d["escalated"],
+            "deEscalated": d["de_escalated"],
+        })
+
+    # Find recurring findings
+    recurring = find_recurring_findings(baselines)
+    recurring_data = [
+        {"rule_id": f["rule_id"], "title": f.get("title", ""),
+         "severity": f.get("severity", ""), "pillar": f.get("pillar", "")}
+        for f in recurring
+    ]
+
+    # Assemble data payload
+    data = {
+        "subscription": baselines[-1]["metadata"].get("subscription_name", "Unknown"),
+        "profile": baselines[-1]["metadata"].get("profile", ""),
+        "assessments": assessments,
+        "diffs": diffs,
+        "recurring": recurring_data,
+    }
+
+    # Generate and write HTML
+    html = generate_html(data)
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    print(f"Trend dashboard generated: {output_path}")
+    print(f"   {len(assessments)} assessments, {len(diffs)} comparisons, {len(recurring_data)} recurring findings")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

@@ -287,7 +287,8 @@ azure-environment-advisor/
 │   │   └── config.yml                # Issue template config (disables blank issues)
 │   └── workflows/
 │       ├── validate-rules.yml        # CI: validates rule files on every PR
-│       └── scheduled-assessment.yml  # Template for periodic assessments (requires customization)
+│       ├── scheduled-assessment.yml  # Automated weekly assessment pipeline
+│       └── drift-detection.yml      # Compares baselines, creates issues for regressions
 ├── rules/
 │   ├── security/
 │   │   ├── defender-plans.md          # Defender for Cloud assessment rules
@@ -336,14 +337,28 @@ azure-environment-advisor/
 │   ├── setup.sh                       # Quick setup — creates .vscode/mcp.json
 │   ├── validate-rules.py              # Rule file validation (CI + local)
 │   ├── create-issues-from-report.py   # Create GitHub Issues from findings
-│   └── compare-assessments.py         # Drift detection between baselines
+│   ├── compare-assessments.py         # Drift detection between baselines
+│   ├── generate-remediation.py        # Generate Bicep fixes from findings
+│   └── generate-trend-dashboard.py    # Trend dashboard from multiple baselines
 ├── baselines/
 │   ├── baseline-schema.json           # JSON schema for assessment baselines
 │   └── example-baseline.json          # Example baseline for reference
 ├── compliance/
 │   └── mapping.json                   # Rule-to-compliance-framework mapping
+├── remediation/
+│   ├── README.md                      # Remediation approach and usage guide
+│   └── bicep/                         # Bicep templates for auto-remediation
+│       ├── SEC-022-enforce-mfa.bicep
+│       ├── SEC-014-remove-public-ip.bicep
+│       ├── SEC-003-security-contact.bicep
+│       ├── REL-010-enable-backup.bicep
+│       ├── REL-003-storage-replication.bicep
+│       ├── COST-001-create-budget.bicep
+│       ├── OPS-001-enable-diagnostics.bicep
+│       └── GOV-011-environment-separation.bicep
 ├── samples/
-│   └── sample-report.html             # Example assessment report
+│   ├── sample-report.html             # Example assessment report
+│   └── sample-trend-dashboard.html    # Example trend dashboard
 └── README.md
 ```
 
@@ -638,6 +653,102 @@ python scripts/compare-assessments.py \
 
 The baseline schema is defined in `baselines/baseline-schema.json` with an example in `baselines/example-baseline.json`.
 
+## Auto-Remediation (Bicep)
+
+Generate ready-to-deploy Bicep files to fix findings automatically:
+
+```bash
+# See what remediations are available
+python scripts/generate-remediation.py --list-templates
+
+# Generate fixes from a baseline (dry run)
+python scripts/generate-remediation.py --baseline baselines/baseline-2026-03-31.json --dry-run
+
+# Generate Bicep parameter files + deploy instructions
+python scripts/generate-remediation.py --baseline baselines/baseline-2026-03-31.json
+```
+
+Available templates cover 8 high-impact rules:
+
+| Rule | Fix | Scope |
+|------|-----|-------|
+| SEC-022 | Enforce MFA via Conditional Access | Subscription |
+| SEC-014 | NSG deny-inbound rule for public IPs | Resource Group |
+| SEC-003 | Defender for Cloud security contact | Subscription |
+| REL-010 | Recovery Services vault + backup policy | Resource Group |
+| REL-003 | Storage replication LRS → GRS | Resource Group |
+| COST-001 | Subscription budget with alerts | Subscription |
+| OPS-001 | Log Analytics + Activity Log diagnostics | Subscription |
+| GOV-011 | Management group prod/nonprod structure | Tenant |
+
+Each generated remediation includes:
+- Parameterized Bicep template
+- Pre-filled parameter file (review `TODO-*` placeholders)
+- Deploy command with `--what-if` for preview
+- Validation instructions using `az bicep build`
+
+> **Tip:** The Copilot agent can also generate custom Bicep fixes using the [Bicep MCP Server](https://learn.microsoft.com/azure/azure-resource-manager/bicep/bicep-mcp-server) for rules not covered by templates. Ask: "Generate a Bicep fix for SEC-020."
+
+See [`remediation/README.md`](remediation/README.md) for full details.
+
+## Trend Dashboard
+
+Track governance improvement over time with a visual HTML dashboard:
+
+```bash
+# Generate from all baselines in a directory
+python scripts/generate-trend-dashboard.py --baselines-dir baselines/ --output trend-dashboard.html
+
+# Or specify individual files
+python scripts/generate-trend-dashboard.py --baselines baseline-jan.json baseline-feb.json baseline-mar.json
+```
+
+The dashboard shows:
+- 📈 **Score trend** — line chart of governance score over time
+- 📊 **Finding counts by severity** — stacked bar chart (Critical/High/Medium/Low)
+- 🏗️ **Pillar breakdown** — table with trend arrows per WAF pillar
+- 🔄 **New vs Resolved** — changes between consecutive assessments
+- 🔁 **Recurring findings** — issues that were never fixed
+- 📝 **Executive summary** — "Your score improved from 62 to 85 over 4 assessments"
+
+> **See it in action:** [Sample trend dashboard](https://htmlpreview.github.io/?https://github.com/ricmmartins/azure-environment-advisor/blob/main/samples/sample-trend-dashboard.html)
+
+## Continuous Governance (GitHub Actions)
+
+Automate assessments with two GitHub Actions workflows:
+
+### Scheduled Assessment (`scheduled-assessment.yml`)
+
+Runs weekly (or on demand) and:
+1. Logs into Azure using service principal credentials
+2. Runs Resource Graph queries to discover resources
+3. Generates a JSON baseline in `baselines/`
+4. Compares with the previous baseline (drift detection)
+5. Generates a trend dashboard
+6. Creates GitHub Issues for new findings
+7. Commits baseline + dashboard to the repo
+8. Posts a summary to the workflow run
+
+**Setup:**
+```bash
+# 1. Create a service principal with Reader role
+az ad sp create-for-rbac --name "advisor-ci" --role Reader \
+  --scopes /subscriptions/<sub-id> --sdk-auth
+
+# 2. Add the JSON output as a GitHub secret
+#    Settings → Secrets → Actions → New secret → AZURE_CREDENTIALS
+
+# 3. Add your subscription ID as a secret
+#    AZURE_SUBSCRIPTION_ID = <your-subscription-id>
+```
+
+### Drift Detection (`drift-detection.yml`)
+
+Triggers automatically after each scheduled assessment:
+- Compares the two most recent baselines
+- Creates a GitHub Issue if new findings or escalations are detected
+- Posts a summary with counts: new, resolved, escalated
+
 ## Auto-Create GitHub Issues
 
 Convert assessment findings into trackable GitHub Issues automatically:
@@ -741,7 +852,8 @@ The validator checks:
 
 - **Multi-subscription assessment** — scan all subs under a management group
 - **Team recommendations** — suggest organizational changes (when to hire a platform team)
-- **Trend dashboards** — visualize drift detection results over time in a web dashboard
 - **Rule marketplace** — community-contributed rule packs for specific industries (healthcare, finance, gaming)
 - **Integration with Azure Monitor** — correlate findings with actual availability/performance metrics
-- **AI-powered remediation** — generate IaC (Bicep/Terraform) patches to fix findings automatically
+- **Terraform remediation templates** — expand auto-remediation beyond Bicep
+- **Score badge** — embeddable shield.io badge showing current governance score
+- **Executive PDF export** — one-page summary for CISOs and compliance reviews
