@@ -1,0 +1,157 @@
+{
+  "metadata": {
+    "subscription_id": "demo",
+    "date": "2026-01-15",
+    "total_resources": 45,
+    "regions": [
+      "eastus"
+    ],
+    "profile": "startup"
+  },
+  "findings": [
+    {
+      "rule_id": "SEC-022",
+      "title": "No MFA enforcement",
+      "severity": "Critical",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "SEC-014",
+      "title": "Public IPs on VMs",
+      "severity": "Critical",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "SEC-003",
+      "title": "No security contact",
+      "severity": "Critical",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "REL-010",
+      "title": "No backup policy",
+      "severity": "High",
+      "pillar": "Reliability"
+    },
+    {
+      "rule_id": "COST-001",
+      "title": "No budget alerts",
+      "severity": "High",
+      "pillar": "Cost Optimization"
+    },
+    {
+      "rule_id": "OPS-001",
+      "title": "No diagnostics",
+      "severity": "High",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "OPS-011",
+      "title": "No tagging strategy",
+      "severity": "High",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "REL-003",
+      "title": "Storage LRS only",
+      "severity": "High",
+      "pillar": "Reliability"
+    },
+    {
+      "rule_id": "SEC-020",
+      "title": "Direct user RBAC",
+      "severity": "Medium",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "SEC-023",
+      "title": "No break-glass account",
+      "severity": "Medium",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "REL-022",
+      "title": "Single instance VMs",
+      "severity": "Medium",
+      "pillar": "Reliability"
+    },
+    {
+      "rule_id": "COST-002",
+      "title": "No cost anomaly detection",
+      "severity": "Medium",
+      "pillar": "Cost Optimization"
+    },
+    {
+      "rule_id": "OPS-020",
+      "title": "No IaC usage",
+      "severity": "Medium",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "OPS-021",
+      "title": "No CI/CD",
+      "severity": "Medium",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "COST-030",
+      "title": "No reserved instances",
+      "severity": "Medium",
+      "pillar": "Cost Optimization"
+    },
+    {
+      "rule_id": "GOV-011",
+      "title": "No env separation",
+      "severity": "Low",
+      "pillar": "Governance"
+    },
+    {
+      "rule_id": "GOV-012",
+      "title": "Inconsistent naming",
+      "severity": "Low",
+      "pillar": "Governance"
+    },
+    {
+      "rule_id": "OPS-032",
+      "title": "No Service Health alerts",
+      "severity": "Low",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "SEC-031",
+      "title": "KV access policies",
+      "severity": "Low",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "SEC-032",
+      "title": "No managed identities",
+      "severity": "Low",
+      "pillar": "Security"
+    }
+  ],
+  "passed": [
+    "PASS-000",
+    "PASS-001",
+    "PASS-002",
+    "PASS-003",
+    "PASS-004",
+    "PASS-005",
+    "PASS-006",
+    "PASS-007",
+    "PASS-008",
+    "PASS-009",
+    "PASS-010",
+    "PASS-011",
+    "PASS-012",
+    "PASS-013",
+    "PASS-014",
+    "PASS-015",
+    "PASS-016",
+    "PASS-017",
+    "PASS-018",
+    "PASS-019",
+    "PASS-020",
+    "PASS-021"
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "metadata": {
+    "subscription_id": "demo",
+    "date": "2026-04-15",
+    "total_resources": 65,
+    "regions": [
+      "eastus",
+      "westus2"
+    ],
+    "profile": "scaleup"
+  },
+  "findings": [
+    {
+      "rule_id": "OPS-011",
+      "title": "No tagging strategy",
+      "severity": "High",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "SEC-020",
+      "title": "Direct user RBAC",
+      "severity": "Medium",
+      "pillar": "Security"
+    },
+    {
+      "rule_id": "OPS-020",
+      "title": "No IaC usage",
+      "severity": "Medium",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "OPS-021",
+      "title": "No CI/CD",
+      "severity": "Medium",
+      "pillar": "Operations"
+    },
+    {
+      "rule_id": "COST-030",
+      "title": "No reserved instances",
+      "severity": "Medium",
+      "pillar": "Cost Optimization"
+    },
+    {
+      "rule_id": "GOV-011",
+      "title": "No env separation",
+      "severity": "Low",
+      "pillar": "Governance"
+    },
+    {
+      "rule_id": "GOV-012",
+      "title": "Inconsistent naming",
+      "severity": "Low",
+      "pillar": "Governance"
+    },
+    {
+      "rule_id": "OPS-032",
+      "title": "No Service Health alerts",
+      "severity": "Low",
+      "pillar": "Operations"
+    }
+  ],
+  "passed": [
+    "PASS-000",
+    "PASS-001",
+    "PASS-002",
+    "PASS-003",
+    "PASS-004",
+    "PASS-005",
+    "PASS-006",
+    "PASS-007",
+    "PASS-008",
+    "PASS-009",
+    "PASS-010",
+    "PASS-011",
+    "PASS-012",
+    "PASS-013",
+    "PASS-014",
+    "PASS-015",
+    "PASS-016",
+    "PASS-017",
+    "PASS-018",
+    "PASS-019",
+    "PASS-020",
+    "PASS-021",
+    "PASS-022",
+    "PASS-023",
+    "PASS-024",
+    "PASS-025",
+    "PASS-026",
+    "PASS-027",
+    "PASS-028",
+    "PASS-029",
+    "PASS-030",
+    "PASS-031",
+    "PASS-032",
+    "PASS-033"
+  ]
+}

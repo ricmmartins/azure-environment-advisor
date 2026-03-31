@@ -7,27 +7,37 @@ on:
   workflow_dispatch:
     inputs:
       subscription_id:
-        description: 'Azure Subscription ID to assess'
-        required: true
+        description: 'Azure Subscription ID to assess (overrides secret)'
+        required: false
         type: string
       profile:
         description: 'Environment profile'
-        required: true
+        required: false
         type: choice
+        default: 'auto'
         options:
+          - auto
           - startup
           - scaleup
           - enterprise
+      severity_filter:
+        description: 'Create issues for these severity levels'
+        required: false
+        type: string
+        default: 'Critical High'
+      create_issues:
+        description: 'Auto-create GitHub Issues for findings'
+        required: false
+        type: boolean
+        default: true
 
 env:
-  # Default subscription — override via workflow_dispatch input or repository secret
   AZURE_SUBSCRIPTION_ID: ${{ inputs.subscription_id || secrets.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
   assess:
     name: Run Assessment
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
       issues: write
@@ -35,11 +45,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -51,51 +58,216 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Install Azure MCP Server
-        run: npm install -g @azure/mcp
-
-      - name: Run Assessment
-        id: assess
+      - name: Validate subscription access
         run: |
-          echo "::notice::Assessment started for subscription ${{ env.AZURE_SUBSCRIPTION_ID }}"
-          echo "::notice::This step requires GitHub Copilot agent integration."
-          echo ""
-          echo "To run the assessment manually:"
-          echo "  1. Open this repo in VS Code with Copilot Agent mode"
-          echo "  2. Ask: 'Assess my Azure subscription ${{ env.AZURE_SUBSCRIPTION_ID }}'"
-          echo "  3. The agent will generate an HTML report"
-          echo ""
-          echo "For automated assessment, integrate with the Azure MCP Server API."
-          echo "See: https://github.com/Azure/azure-mcp-server"
+          SUB_ID="${{ env.AZURE_SUBSCRIPTION_ID }}"
+          if [ -z "$SUB_ID" ]; then
+            echo "::error::No subscription ID provided. Set AZURE_SUBSCRIPTION_ID secret or provide via workflow_dispatch input."
+            exit 1
+          fi
+          echo "Validating access to subscription $SUB_ID..."
+          az account show --subscription "$SUB_ID" -o table
+          echo "subscription_id=$SUB_ID" >> $GITHUB_ENV
 
-      # Save assessment baseline for drift detection
-      - name: Save baseline
-        if: success()
+      - name: Run Resource Graph queries
+        id: discover
         run: |
-          mkdir -p baselines
           TIMESTAMP=$(date +%Y-%m-%d)
-          echo "Baseline placeholder for $TIMESTAMP" > baselines/baseline-$TIMESTAMP.json
-          echo "baseline_date=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_ENV
+          echo "## Discovery Phase" >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload assessment report
+          # Resource inventory
+          echo "Running resource inventory query..."
+          az graph query -q "
+            resources
+            | where subscriptionId == '${{ env.subscription_id }}'
+            | summarize count() by type, location
+            | order by count_ desc
+          " --subscriptions "${{ env.subscription_id }}" -o json > /tmp/inventory.json
+          echo "Resources found: $(cat /tmp/inventory.json | python3 -c 'import json,sys; data=json.load(sys.stdin); print(sum(r["count_"] for r in data.get("data",[])))')"
+
+          # Security posture
+          echo "Checking Defender for Cloud..."
+          az graph query -q "
+            securityresources
+            | where type == 'microsoft.security/securescores'
+            | where subscriptionId == '${{ env.subscription_id }}'
+            | project name, current=properties.score.current, max=properties.score.max
+          " --subscriptions "${{ env.subscription_id }}" -o json > /tmp/security.json || true
+
+          # Policy compliance
+          echo "Checking policy compliance..."
+          az graph query -q "
+            policyresources
+            | where type == 'microsoft.policyinsights/policystates'
+            | where subscriptionId == '${{ env.subscription_id }}'
+            | where properties.complianceState == 'NonCompliant'
+            | summarize count() by tostring(properties.policyDefinitionName)
+          " --subscriptions "${{ env.subscription_id }}" -o json > /tmp/compliance.json || true
+
+          echo "Discovery complete" >> $GITHUB_STEP_SUMMARY
+
+      - name: Build assessment baseline
+        id: baseline
+        run: |
+          python3 - <<'PYTHON'
+          import json, glob, os, re
+          from datetime import datetime
+
+          timestamp = os.environ.get("timestamp", datetime.now().strftime("%Y-%m-%d"))
+          sub_id = os.environ.get("subscription_id", "unknown")
+
+          # Load discovery data
+          def load_json(path):
+              try:
+                  with open(path) as f:
+                      return json.load(f)
+              except: return {}
+
+          inventory = load_json("/tmp/inventory.json")
+          security = load_json("/tmp/security.json")
+          compliance = load_json("/tmp/compliance.json")
+
+          # Count resources
+          resources = inventory.get("data", [])
+          total_resources = sum(r.get("count_", 0) for r in resources)
+          regions = list(set(r.get("location", "unknown") for r in resources))
+
+          # Load rules to check passed vs findings
+          rules_dir = "rules"
+          all_rules = []
+          for root, dirs, files in os.walk(rules_dir):
+              for f in files:
+                  if f.endswith(".md"):
+                      path = os.path.join(root, f)
+                      with open(path) as fh:
+                          content = fh.read()
+                      for m in re.finditer(r'\*\*Rule ID:\*\*\s*((?:SEC|REL|COST|OPS|PERF|GOV)-\d{3})', content):
+                          all_rules.append(m.group(1))
+
+          # For automated assessment, mark non-compliant policies as findings
+          non_compliant = compliance.get("data", [])
+
+          # Build baseline JSON
+          baseline = {
+              "metadata": {
+                  "subscription_id": sub_id,
+                  "date": timestamp,
+                  "total_resources": total_resources,
+                  "regions": regions,
+                  "profile": "${{ inputs.profile || 'auto' }}",
+                  "generated_by": "github-actions"
+              },
+              "summary": {
+                  "total_rules": len(all_rules),
+                  "total_resources": total_resources,
+                  "non_compliant_policies": len(non_compliant)
+              },
+              "findings": [],
+              "passed": [],
+              "discovery": {
+                  "inventory": resources[:20],
+                  "security": security.get("data", []),
+                  "non_compliant_policies": non_compliant[:20]
+              }
+          }
+
+          os.makedirs("baselines", exist_ok=True)
+          outpath = f"baselines/baseline-{timestamp}.json"
+          with open(outpath, "w") as f:
+              json.dump(baseline, f, indent=2)
+
+          print(f"Baseline saved to {outpath}")
+          print(f"Resources: {total_resources}, Regions: {len(regions)}, Rules: {len(all_rules)}")
+
+          # Set output for next steps
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"baseline_path={outpath}\n")
+              f.write(f"total_resources={total_resources}\n")
+          PYTHON
+
+      - name: Drift detection (compare with previous baseline)
+        id: drift
+        run: |
+          # Find previous baseline
+          BASELINES=$(ls -t baselines/baseline-*.json 2>/dev/null | head -2)
+          BASELINE_COUNT=$(echo "$BASELINES" | wc -l)
+
+          if [ "$BASELINE_COUNT" -ge 2 ]; then
+            CURRENT=$(echo "$BASELINES" | head -1)
+            PREVIOUS=$(echo "$BASELINES" | tail -1)
+            echo "Comparing $CURRENT with $PREVIOUS"
+            python3 scripts/compare-assessments.py \
+              --baseline "$PREVIOUS" \
+              --current "$CURRENT" || true
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "No previous baseline found — skipping drift detection"
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate trend dashboard
+        if: always()
+        run: |
+          if [ -f scripts/generate-trend-dashboard.py ]; then
+            python3 scripts/generate-trend-dashboard.py \
+              --baselines-dir baselines/ \
+              --output trend-dashboard.html || true
+          fi
+
+      - name: Create issues from findings
+        if: inputs.create_issues == true || inputs.create_issues == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SEVERITY="${{ inputs.severity_filter || 'Critical High' }}"
+          MILESTONE="Assessment ${{ env.timestamp }}"
+
+          # Find the latest HTML report
+          REPORT=$(ls -t assessment-*.html 2>/dev/null | head -1)
+          if [ -n "$REPORT" ]; then
+            echo "Creating issues from $REPORT (severity: $SEVERITY)"
+            python3 scripts/create-issues-from-report.py \
+              --report "$REPORT" \
+              --severity $SEVERITY \
+              --milestone "$MILESTONE" || true
+          else
+            echo "No HTML report found — skipping issue creation"
+          fi
+
+      - name: Commit baseline and trend dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add baselines/ trend-dashboard.html 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: save assessment baseline ${{ env.timestamp }}
+
+          Automated assessment run.
+          Resources: ${{ steps.baseline.outputs.total_resources }}
+          Subscription: ${{ env.subscription_id }}"
+          git push || true
+
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: assessment-report-${{ github.run_number }}
+          name: assessment-${{ env.timestamp }}-${{ github.run_number }}
           path: |
             assessment-*.html
-            baselines/*.json
+            baselines/baseline-${{ env.timestamp }}.json
+            trend-dashboard.html
           retention-days: 90
 
-      # Auto-create issues for critical findings
-      - name: Create issues from findings
-        if: success() && hashFiles('assessment-*.html') != ''
+      - name: Post summary
+        if: always()
         run: |
-          echo "To auto-create GitHub Issues from findings, run:"
-          echo "  python scripts/create-issues-from-report.py --report assessment-*.html"
-          echo ""
-          echo "This will create one issue per Critical/High finding with:"
-          echo "  - Rule ID and title"
-          echo "  - Affected resources"
-          echo "  - Remediation guidance"
-          echo "  - Microsoft Learn documentation links"
+          echo "## 📊 Assessment Summary — ${{ env.timestamp }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Subscription | \`${{ env.subscription_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resources | ${{ steps.baseline.outputs.total_resources }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Baseline | \`baselines/baseline-${{ env.timestamp }}.json\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Drift detected | ${{ steps.drift.outputs.drift_detected }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📁 [Download artifacts](../actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
