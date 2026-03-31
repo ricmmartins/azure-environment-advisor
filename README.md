@@ -93,7 +93,7 @@ An AI agent (powered by GitHub Copilot + Azure MCP Server) that:
 
 ## Assessment Pillars
 
-The agent assesses across all 5 Well-Architected Framework pillars, plus governance and cost:
+The agent assesses across all 5 Well-Architected Framework pillars, plus governance:
 
 ### 1. Reliability
 - Are zone-redundant SKUs used for critical resources?
@@ -283,10 +283,11 @@ azure-environment-advisor/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── new-rule-request.yml      # Template: propose a new assessment rule
 │   │   ├── false-positive.yml        # Template: report a false positive finding
-│   │   └── bug-report.yml            # Template: report a bug
+│   │   ├── bug-report.yml            # Template: report a bug
+│   │   └── config.yml                # Issue template config (disables blank issues)
 │   └── workflows/
 │       ├── validate-rules.yml        # CI: validates rule files on every PR
-│       └── scheduled-assessment.yml  # Scheduled periodic assessments
+│       └── scheduled-assessment.yml  # Template for periodic assessments (requires customization)
 ├── rules/
 │   ├── security/
 │   │   ├── defender-plans.md          # Defender for Cloud assessment rules
@@ -358,7 +359,7 @@ azure-environment-advisor/
 | Conversational (ask follow-ups) | ❌ | ❌ | ❌ | ✅ |
 | Compares to ALZ landing zone patterns | ❌ | ❌ | ❌ | ✅ |
 | Open source / extensible rules | ❌ | ❌ | ❌ | ✅ |
-| Works offline (no Azure portal) | ❌ | ❌ | ❌ | ✅ (via MCP) |
+| Works without Azure Portal UI | ❌ | ❌ | ❌ | ✅ (via MCP) |
 
 ## Technical Requirements
 
@@ -369,14 +370,15 @@ azure-environment-advisor/
 
 ## Getting Started
 
-### How It Works (Key Concepts)
-
-Before you begin, here's what each piece does:
+<details>
+<summary><strong>Key Concepts</strong> — what each piece does (click to expand)</summary>
 
 - **GitHub Copilot** is an AI assistant built into VS Code (and the GitHub CLI). You type a request in plain English, and it executes multi-step tasks for you. In **Agent mode**, Copilot can use external tools — like the Azure MCP Server — to read data and act on it.
 - **MCP (Model Context Protocol)** is an open standard that lets AI assistants connect to external systems. Think of it as a "plugin" that gives Copilot the ability to read your Azure subscription.
 - **Azure MCP Server** is the specific MCP plugin for Azure. It gives Copilot **read-only** access to your subscription's resources, configurations, and policies — it cannot modify anything.
 - **This repository** contains the assessment rules, queries, and report template. When you ask Copilot to "assess my Azure subscription," it reads these files, connects to Azure via MCP, and generates an HTML report.
+
+</details>
 
 ### 1. Prerequisites
 
@@ -385,8 +387,9 @@ Before you begin, here's what each piece does:
 | **Azure subscription** | The Azure environment you want to assess. If you don't have one, [create a free Azure account](https://azure.microsoft.com/free/) ($200 free credit for 30 days). | [azure.microsoft.com/free](https://azure.microsoft.com/free/) |
 | **GitHub Copilot** | AI assistant subscription (Individual, Business, or Enterprise). Needed to run the agent. | [github.com/features/copilot](https://github.com/features/copilot) |
 | **VS Code** | The recommended editor. Install the **GitHub Copilot** and **GitHub Copilot Chat** extensions from the Extensions marketplace (`Ctrl+Shift+X` → search "GitHub Copilot"). | [code.visualstudio.com](https://code.visualstudio.com/) |
-| **Node.js** (v18+) | Required to run the Azure MCP Server. If using the Copilot CLI, you need v24+. | [nodejs.org](https://nodejs.org/) |
+| **Node.js** | Required only if using the `npx`-based MCP config (v18+) or the Copilot CLI (v24+). Not needed if using the VS Code MCP extension. | [nodejs.org](https://nodejs.org/) |
 | **Git** | To clone this repository. | [git-scm.com](https://git-scm.com/) |
+| **Python** (3.9+) | Only needed for the helper scripts (validate rules, create issues, drift detection). Not required for the core assessment. | [python.org](https://www.python.org/) |
 
 ### 2. Install Azure CLI and Log In
 
@@ -423,13 +426,13 @@ az account show --query "{Name:name, Id:id, State:state}" -o table
 
 ### 3. Install Azure MCP Server
 
-The simplest approach is to let VS Code handle it automatically via the MCP config (next step). But if you want to install globally:
+You have three options (pick one):
 
-```bash
-npm install -g @azure/mcp
-```
+- **VS Code extension (easiest):** Install the [Azure MCP Server Extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server) from the VS Code marketplace — no npm needed.
+- **Automatic via MCP config:** The `.vscode/mcp.json` config in the next step uses `npx`, which downloads the server automatically on first run — no separate install needed.
+- **Global install:** `npm install -g @azure/mcp` (requires Node.js 18+)
 
-> **Note:** Check the [Azure MCP Server documentation](https://learn.microsoft.com/azure/developer/azure-mcp-server/get-started) for the latest installation instructions. For VS Code, you can also install the [Azure MCP Server Extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server) directly — no npm install needed.
+> **Note:** Check the [Azure MCP Server documentation](https://learn.microsoft.com/azure/developer/azure-mcp-server/get-started) for the latest instructions.
 
 ### 4. Clone This Repository
 
@@ -525,7 +528,7 @@ code .
 Assess my Azure subscription
 ```
 
-Copilot will read the `.github/copilot-instructions.md` file, connect to Azure via the MCP Server, and start the 5-phase assessment.
+Copilot will read the `.github/copilot-instructions.md` file, connect to Azure via the MCP Server, and start the assessment.
 
 **Alternative — In GitHub Copilot CLI:**
 
@@ -558,7 +561,7 @@ When the assessment finishes, Copilot creates a single HTML file in the project 
 
 ```
 azure-environment-advisor/
-  assessment-contoso-prod-2025-01-15.html    ← your report
+  assessment-contoso-prod-2026-03-31.html    ← your report
 ```
 
 Open it in any browser (double-click the file, or right-click → "Open with" → your browser). No server required. You can:
@@ -588,7 +591,7 @@ Open it in any browser (double-click the file, or right-click → "Open with" �
 
 ### Customization
 
-**Add your own rules:** Create a new `.md` file in the appropriate `rules/` subfolder following the existing format. The agent automatically picks up all rules. Use the [New Rule Request](../../issues/new?template=new-rule-request.yml) issue template to propose rules.
+**Add your own rules:** Create a new `.md` file in the appropriate `rules/` subfolder following the existing format. The agent automatically picks up all rules. Use the [New Rule Request](https://github.com/ricmmartins/azure-environment-advisor/issues/new?template=new-rule-request.yml) issue template to propose rules.
 
 **Adjust severity for your context:** Edit the profile files in `profiles/` to change how severity is calibrated for your company stage.
 
@@ -693,9 +696,9 @@ The mapping is stored in `compliance/mapping.json` and is automatically included
 
 We welcome contributions! Here's how:
 
-1. **Propose a new rule** — Use the [New Rule Request](../../issues/new?template=new-rule-request.yml) issue template
-2. **Report a false positive** — Use the [False Positive](../../issues/new?template=false-positive.yml) issue template
-3. **Report a bug** — Use the [Bug Report](../../issues/new?template=bug-report.yml) issue template
+1. **Propose a new rule** — Use the [New Rule Request](https://github.com/ricmmartins/azure-environment-advisor/issues/new?template=new-rule-request.yml) issue template
+2. **Report a false positive** — Use the [False Positive](https://github.com/ricmmartins/azure-environment-advisor/issues/new?template=false-positive.yml) issue template
+3. **Report a bug** — Use the [Bug Report](https://github.com/ricmmartins/azure-environment-advisor/issues/new?template=bug-report.yml) issue template
 4. **Submit a PR** — The `validate-rules.yml` workflow will automatically validate your rule files
 
 ### Rule Validation
@@ -716,6 +719,8 @@ The validator checks:
 - Pillar consistency (rule prefix matches declared pillar)
 - Severity values
 - Profile coverage (every rule should appear in profile severity tables)
+
+> **Note:** All scripts use Python standard library only — no `pip install` required.
 
 ## Glossary
 
