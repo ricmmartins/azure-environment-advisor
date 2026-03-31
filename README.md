@@ -561,11 +561,17 @@ Open it in any browser (double-click the file, or right-click → "Open with" �
 |---|---|
 | `az login` opens a browser but nothing happens | Make sure you're signing in with the Azure account that has access to the target subscription. After signing in, return to the terminal — it should show "You have logged in." |
 | `az account list` shows no subscriptions | Your account may not have any subscriptions. Check with your Azure administrator, or [create a free account](https://azure.microsoft.com/free/). |
+| 403 Forbidden / "does not have authorization" | The account you're signed in with doesn't have access to the subscription ID in your MCP config. Run `az account list --output table` to see which subscriptions you can access, then update the `AZURE_SUBSCRIPTION_ID` in your MCP config to match. |
+| VS Code uses a different account than the CLI | VS Code and `az login` maintain **separate sessions**. Press `F1` → "Azure: Sign Out", then `F1` → "Azure: Sign In" (or "Azure: Sign In to Directory..." to pick a specific tenant). After signing in, restart the MCP server or reload VS Code. |
+| Multi-tenant: signed in but can't see the subscription | If your account has access to multiple tenants, you may be signed into the wrong one. In the CLI: `az login --tenant <tenant-id>`. In VS Code: `F1` → "Azure: Sign In to Directory..." and select the correct tenant. |
 | `npm install -g @azure/mcp` fails | Make sure Node.js v18+ is installed (`node --version`). On macOS/Linux you may need `sudo`. |
 | Copilot doesn't seem to connect to Azure | Verify the MCP config: check that `.vscode/mcp.json` exists, the subscription ID is correct, and you've restarted VS Code. Try `az account show` to confirm you're logged in. |
 | Copilot says "I can't access Azure" or times out | Run `az login` again — your token may have expired. Also verify `AZURE_SUBSCRIPTION_ID` in your MCP config matches the subscription from `az account show`. |
 | The report is missing findings or seems incomplete | Large subscriptions may hit Copilot's context limits. Try assessing one resource group at a time: "Assess the resources in resource group rg-production". |
 | "Agent mode" not available in VS Code | Make sure the **GitHub Copilot Chat** extension is installed and you have a Copilot subscription. Update VS Code to the latest version. Agent mode requires VS Code 1.99+. |
+| `gh copilot` requires Node.js v24+ | The Copilot CLI needs Node.js v24 or higher. Upgrade with `nvm install 24 && nvm use 24`. |
+| `gh copilot` → "unknown command" | Your GitHub CLI is too old. Update to gh 2.49+ (`sudo apt upgrade gh` or reinstall from https://cli.github.com). |
+| Old `gh-copilot` extension conflicts | If you previously installed `gh extension install github/gh-copilot`, remove it: `gh extension remove gh-copilot`. The new Copilot CLI is built-in. |
 
 ### Customization
 
