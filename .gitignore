@@ -6,6 +6,12 @@ baselines/baseline-*.json
 # Generated assessment reports
 assessment-*.html
 
+# Generated remediation output
+remediation/generated/
+
+# Generated trend dashboard
+trend-dashboard.html
+
 # Python
 __pycache__/
 *.pyc
