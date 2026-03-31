@@ -453,43 +453,7 @@ python scripts/create-issues-from-report.py --report assessment-report.html --se
 
 ---
 
-## Phase 9: Auto-Remediation (Bicep/Terraform)
-
-When the user asks to **fix**, **remediate**, or **generate IaC** for findings:
-
-1. Check `remediation/bicep/` for pre-built templates matching the finding's rule ID
-2. If a template exists, generate a parameter file customized to the finding's affected resources
-3. If no template exists, use the **Bicep MCP Server** tools to generate a fix:
-   - Use `get_az_resource_type_schema` to get the correct resource schema
-   - Use `get_bicep_best_practices` to ensure the code follows best practices
-   - Use `get_bicep_file_diagnostics` to validate the generated code
-4. Present the remediation as a ready-to-deploy command with `--what-if` for preview
-
-Available templates (in `remediation/bicep/`):
-
-| Rule ID | Fix | Scope |
-|---------|-----|-------|
-| SEC-022 | Enforce MFA via Conditional Access | Subscription |
-| SEC-014 | NSG deny-inbound rule for public IPs | Resource Group |
-| SEC-003 | Defender for Cloud security contact | Subscription |
-| REL-010 | Recovery Services vault + backup policy | Resource Group |
-| REL-003 | Storage replication LRS → GRS | Resource Group |
-| COST-001 | Subscription budget with alerts | Subscription |
-| OPS-001 | Log Analytics + Activity Log diagnostics | Subscription |
-| GOV-011 | Management group prod/nonprod structure | Tenant |
-
-To generate all remediations from a baseline:
-```
-python scripts/generate-remediation.py --baseline baselines/baseline-2026-03-31.json
-python scripts/generate-remediation.py --baseline baselines/baseline-2026-03-31.json --dry-run
-python scripts/generate-remediation.py --list-templates
-```
-
-**Important:** Always recommend `--what-if` before actual deployment, and remind the user to review generated parameter files for `TODO-*` placeholders.
-
----
-
-## Phase 10: Trend Dashboard
+## Phase 9: Trend Dashboard
 
 When the user asks about **trends**, **progress**, or **how the environment changed over time**:
 

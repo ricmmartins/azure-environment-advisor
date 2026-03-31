@@ -338,24 +338,12 @@ azure-environment-advisor/
 │   ├── validate-rules.py              # Rule file validation (CI + local)
 │   ├── create-issues-from-report.py   # Create GitHub Issues from findings
 │   ├── compare-assessments.py         # Drift detection between baselines
-│   ├── generate-remediation.py        # Generate Bicep fixes from findings
 │   └── generate-trend-dashboard.py    # Trend dashboard from multiple baselines
 ├── baselines/
 │   ├── baseline-schema.json           # JSON schema for assessment baselines
 │   └── example-baseline.json          # Example baseline for reference
 ├── compliance/
 │   └── mapping.json                   # Rule-to-compliance-framework mapping
-├── remediation/
-│   ├── README.md                      # Remediation approach and usage guide
-│   └── bicep/                         # Bicep templates for auto-remediation
-│       ├── SEC-022-enforce-mfa.bicep
-│       ├── SEC-014-remove-public-ip.bicep
-│       ├── SEC-003-security-contact.bicep
-│       ├── REL-010-enable-backup.bicep
-│       ├── REL-003-storage-replication.bicep
-│       ├── COST-001-create-budget.bicep
-│       ├── OPS-001-enable-diagnostics.bicep
-│       └── GOV-011-environment-separation.bicep
 ├── samples/
 │   ├── sample-report.html             # Example assessment report
 │   └── sample-trend-dashboard.html    # Example trend dashboard
@@ -653,44 +641,6 @@ python scripts/compare-assessments.py \
 
 The baseline schema is defined in `baselines/baseline-schema.json` with an example in `baselines/example-baseline.json`.
 
-## Auto-Remediation (Bicep)
-
-Generate ready-to-deploy Bicep files to fix findings automatically:
-
-```bash
-# See what remediations are available
-python scripts/generate-remediation.py --list-templates
-
-# Generate fixes from a baseline (dry run)
-python scripts/generate-remediation.py --baseline baselines/baseline-2026-03-31.json --dry-run
-
-# Generate Bicep parameter files + deploy instructions
-python scripts/generate-remediation.py --baseline baselines/baseline-2026-03-31.json
-```
-
-Available templates cover 8 high-impact rules:
-
-| Rule | Fix | Scope |
-|------|-----|-------|
-| SEC-022 | Enforce MFA via Conditional Access | Subscription |
-| SEC-014 | NSG deny-inbound rule for public IPs | Resource Group |
-| SEC-003 | Defender for Cloud security contact | Subscription |
-| REL-010 | Recovery Services vault + backup policy | Resource Group |
-| REL-003 | Storage replication LRS → GRS | Resource Group |
-| COST-001 | Subscription budget with alerts | Subscription |
-| OPS-001 | Log Analytics + Activity Log diagnostics | Subscription |
-| GOV-011 | Management group prod/nonprod structure | Tenant |
-
-Each generated remediation includes:
-- Parameterized Bicep template
-- Pre-filled parameter file (review `TODO-*` placeholders)
-- Deploy command with `--what-if` for preview
-- Validation instructions using `az bicep build`
-
-> **Tip:** The Copilot agent can also generate custom Bicep fixes using the [Bicep MCP Server](https://learn.microsoft.com/azure/azure-resource-manager/bicep/bicep-mcp-server) for rules not covered by templates. Ask: "Generate a Bicep fix for SEC-020."
-
-See [`remediation/README.md`](remediation/README.md) for full details.
-
 ## Trend Dashboard
 
 Track governance improvement over time with a visual HTML dashboard:
@@ -850,10 +800,7 @@ The validator checks:
 
 ## Future Possibilities
 
-- **Multi-subscription assessment** — scan all subs under a management group
 - **Team recommendations** — suggest organizational changes (when to hire a platform team)
 - **Rule marketplace** — community-contributed rule packs for specific industries (healthcare, finance, gaming)
 - **Integration with Azure Monitor** — correlate findings with actual availability/performance metrics
-- **Terraform remediation templates** — expand auto-remediation beyond Bicep
-- **Score badge** — embeddable shield.io badge showing current governance score
 - **Executive PDF export** — one-page summary for CISOs and compliance reviews
