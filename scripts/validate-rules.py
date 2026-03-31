@@ -33,7 +33,7 @@ from typing import Optional
 RULES_DIR = "rules"
 PROFILES_DIR = "profiles"
 REQUIRED_SECTIONS = ["What to Check", "Finding Template", "Learn More"]
-VALID_PILLARS = ["Security", "Reliability", "Cost Optimization", "Operational Excellence", "Performance Efficiency", "Governance"]
+VALID_PILLARS = ["Security", "Reliability", "Cost Optimization", "Operational Excellence", "Performance", "Governance"]
 VALID_SEVERITIES = ["Critical", "High", "Medium", "Low", "Informational"]
 RULE_ID_PATTERN = re.compile(r"^(SEC|REL|COST|OPS|PERF|GOV)-\d{3}$")
 PILLAR_PREFIXES = {

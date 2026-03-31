@@ -26,7 +26,7 @@ Startups need to move fast without accumulating security debt. Recommendations f
 - Single subscription is acceptable.
 - Basic tagging (`environment`, `owner`) is sufficient.
 - **Security Defaults** for MFA enforcement (Conditional Access not required yet).
-- No landing zone needed yet, but consider [Startup Scale Landing Zone (SSLZ)](https://startupscalelanding.zone) as the recommended pattern when ready to formalize.
+- No landing zone needed yet, but consider the [Azure Landing Zone](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/) as the recommended pattern when ready to formalize.
 - IaC is encouraged but not required — consistency matters more than tooling.
 
 ## Severity Adjustments
@@ -109,4 +109,4 @@ Enterprise-grade governance findings are downgraded for startups. Focus on what 
 
 ## Recommended Landing Zone
 
-**[Startup Scale Landing Zone (SSLZ)](https://startupscalelanding.zone)** — A lightweight landing zone pattern designed for startups that provides security foundations without enterprise complexity. Adopt this when the team grows beyond 10–15 engineers or when the first production workload requires formal governance.
+**[Azure Landing Zone](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/)** — Start with a lightweight landing zone that provides security foundations without enterprise complexity. Adopt this when the team grows beyond 10–15 engineers or when the first production workload requires formal governance.

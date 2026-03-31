@@ -2,6 +2,24 @@
 
 An AI-powered agent that connects to your Azure subscription, assesses your environment against best practices, and generates an interactive HTML report with findings and Microsoft Learn documentation links — tailored to your company's stage and architecture.
 
+## Quick Start
+
+```bash
+az login                           # Sign in with Reader access on the target subscription
+git clone https://github.com/ricmmartins/azure-environment-advisor.git
+cd azure-environment-advisor
+```
+
+Then **pick one**:
+
+| Method | Setup |
+|--------|-------|
+| **Quick setup script** | `bash scripts/setup.sh` — prompts for subscription ID, creates `.vscode/mcp.json` for you |
+| **VS Code (manual)** | Create `.vscode/mcp.json` ([template below](#5-configure-mcp-server)), open in VS Code, switch Copilot Chat to **Agent mode**, type: **"Assess my Azure subscription"** |
+| **Copilot CLI** | `gh copilot -p "Assess my Azure subscription using the rules in this project" --allow-all` (requires Node.js 24+) |
+
+👉 [Full setup guide](#getting-started) · [Sample report](samples/sample-report.html) · [Example issues](https://github.com/ricmmartins/azure-environment-advisor/issues)
+
 ## The Problem
 
 Teams deploying on Azure today face a fragmented landscape of advisory tools:
@@ -120,11 +138,11 @@ The agent assesses across all 5 Well-Architected Framework pillars, plus governa
 - Is auto-scaling configured for compute resources?
 - Are resources deployed in the closest region to users?
 
-### 6. Governance & Landing Zone
+### 6. Governance
 - Is there a management group structure?
 - Is subscription topology appropriate (prod/nonprod separation)?
 - Are Azure Policies enforcing baseline standards?
-- How does the current state compare to SSLZ / Trey Research / full ALZ?
+- How does the current state compare to Azure Landing Zone patterns?
 - What's the recommended graduation path based on current complexity?
 
 ## How It Works
@@ -295,7 +313,7 @@ azure-environment-advisor/
 │   │   ├── caching.md                 # Redis, CDN usage
 │   │   └── database-tiers.md          # DTU vs vCore, service tiers
 │   └── governance/
-│       ├── landing-zone-maturity.md   # SSLZ vs Trey Research vs full ALZ
+│       ├── landing-zone-maturity.md   # Landing zone maturity assessment
 │       ├── subscription-topology.md   # Sub organization assessment
 │       └── management-groups.md       # MG hierarchy assessment
 ├── queries/
@@ -314,6 +332,7 @@ azure-environment-advisor/
 │   ├── scaleup.md                     # Assessment context for scale-ups (50-200 eng)
 │   └── enterprise.md                  # Assessment context for enterprise (200+ eng)
 ├── scripts/
+│   ├── setup.sh                       # Quick setup — creates .vscode/mcp.json
 │   ├── validate-rules.py              # Rule file validation (CI + local)
 │   ├── create-issues-from-report.py   # Create GitHub Issues from findings
 │   └── compare-assessments.py         # Drift detection between baselines
@@ -337,7 +356,7 @@ azure-environment-advisor/
 | Links to MS Learn docs per finding | ❌ | ❌ | ❌ | ✅ |
 | Landing zone maturity assessment | ❌ | ❌ | ❌ | ✅ |
 | Conversational (ask follow-ups) | ❌ | ❌ | ❌ | ✅ |
-| Compares to SSLZ/ALZ patterns | ❌ | ❌ | ❌ | ✅ |
+| Compares to ALZ landing zone patterns | ❌ | ❌ | ❌ | ✅ |
 | Open source / extensible rules | ❌ | ❌ | ❌ | ✅ |
 | Works offline (no Azure portal) | ❌ | ❌ | ❌ | ✅ (via MCP) |
 
@@ -366,7 +385,7 @@ Before you begin, here's what each piece does:
 | **Azure subscription** | The Azure environment you want to assess. If you don't have one, [create a free Azure account](https://azure.microsoft.com/free/) ($200 free credit for 30 days). | [azure.microsoft.com/free](https://azure.microsoft.com/free/) |
 | **GitHub Copilot** | AI assistant subscription (Individual, Business, or Enterprise). Needed to run the agent. | [github.com/features/copilot](https://github.com/features/copilot) |
 | **VS Code** | The recommended editor. Install the **GitHub Copilot** and **GitHub Copilot Chat** extensions from the Extensions marketplace (`Ctrl+Shift+X` → search "GitHub Copilot"). | [code.visualstudio.com](https://code.visualstudio.com/) |
-| **Node.js** (v18+) | Required to run the Azure MCP Server. | [nodejs.org](https://nodejs.org/) |
+| **Node.js** (v18+) | Required to run the Azure MCP Server. If using the Copilot CLI, you need v24+. | [nodejs.org](https://nodejs.org/) |
 | **Git** | To clone this repository. | [git-scm.com](https://git-scm.com/) |
 
 ### 2. Install Azure CLI and Log In
@@ -404,19 +423,13 @@ az account show --query "{Name:name, Id:id, State:state}" -o table
 
 ### 3. Install Azure MCP Server
 
+The simplest approach is to let VS Code handle it automatically via the MCP config (next step). But if you want to install globally:
+
 ```bash
 npm install -g @azure/mcp
 ```
 
-Verify it installed correctly:
-
-```bash
-npx @azure/mcp --help
-```
-
-> If you see usage information, the server is installed. If you see an error, check that Node.js v18+ is installed (`node --version`).
-
-> **Note:** Check the [Azure MCP Server documentation](https://learn.microsoft.com/azure/developer/azure-mcp-server/get-started) for the latest installation instructions. For VS Code, you can also install the [Azure MCP Server Extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server) directly.
+> **Note:** Check the [Azure MCP Server documentation](https://learn.microsoft.com/azure/developer/azure-mcp-server/get-started) for the latest installation instructions. For VS Code, you can also install the [Azure MCP Server Extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server) directly — no npm install needed.
 
 ### 4. Clone This Repository
 
@@ -702,7 +715,6 @@ The validator checks:
 | **WAF** | [Well-Architected Framework](https://learn.microsoft.com/azure/well-architected/) — Microsoft's 5-pillar framework for building reliable, secure, efficient, cost-optimized, and operationally excellent workloads |
 | **CAF** | [Cloud Adoption Framework](https://learn.microsoft.com/azure/cloud-adoption-framework/) — Microsoft's guidance for cloud adoption strategy, planning, and governance |
 | **ALZ** | [Azure Landing Zone](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/) — A target architecture for enterprise Azure environments with management groups, networking, and governance |
-| **SSLZ** | [Startup Scale Landing Zone](https://startupscalelanding.zone) — A lightweight landing zone pattern designed for startups |
 | **MCP** | [Model Context Protocol](https://modelcontextprotocol.io/) — An open protocol that allows AI agents to connect to external tools and data sources |
 | **NSG** | Network Security Group — Azure's network-level firewall for controlling traffic to/from subnets and VMs |
 | **RBAC** | Role-Based Access Control — Azure's authorization system for managing who can do what on which resources |
@@ -719,12 +731,3 @@ The validator checks:
 - **Rule marketplace** — community-contributed rule packs for specific industries (healthcare, finance, gaming)
 - **Integration with Azure Monitor** — correlate findings with actual availability/performance metrics
 - **AI-powered remediation** — generate IaC (Bicep/Terraform) patches to fix findings automatically
-
-## Relationship to SSLZ
-
-This project is **complementary** to the [Startup-Scale Landing Zone](https://startupscalelanding.zone):
-
-- **SSLZ** = opinionated infrastructure code for deploying a landing zone from scratch
-- **Azure Environment Advisor** = assessment tool for evaluating any existing Azure environment
-
-The agent can recommend SSLZ for greenfield startups, Trey Research for small enterprises, or full ALZ for mature organizations — based on what it discovers in the environment.

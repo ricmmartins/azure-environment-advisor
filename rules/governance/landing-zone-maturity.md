@@ -45,7 +45,7 @@ If custom management groups = 0, subscriptions = 1, hub VNets = 0, and policy as
 **Title:** No landing zone structure detected  
 **What was found:** The environment has no custom management groups, a single subscription, no hub network, and no meaningful Azure Policy assignments. There is no landing zone architecture in place.  
 **Why it matters:** Without a landing zone, environments lack governance guardrails, network segmentation, and consistent security baselines. This makes it difficult to scale securely, onboard new workloads, or meet compliance requirements as the organization grows.  
-**Recommendation:** Adopt a landing zone architecture appropriate for your maturity level. Startup → Start with the Startup Scale Landing Zone (startupscalelanding.zone). Scale-up → Follow the Trey Research pattern with hub-spoke networking. Enterprise → Deploy the full Azure Landing Zone (ALZ) accelerator.
+**Recommendation:** Adopt a landing zone architecture appropriate for your maturity level. Startup → Start with a lightweight landing zone following Azure Landing Zone guidance. Scale-up → Follow the hub-spoke networking pattern. Enterprise → Deploy the full Azure Landing Zone (ALZ) accelerator.
 
 ### Learn More
 - [What is an Azure landing zone?](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/) — Overview of landing zone concepts, design areas, and implementation options
