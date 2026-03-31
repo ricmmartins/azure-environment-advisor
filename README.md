@@ -18,7 +18,7 @@ Then **pick one**:
 | **VS Code (manual)** | Create `.vscode/mcp.json` ([template below](#5-configure-mcp-server)), open in VS Code, switch Copilot Chat to **Agent mode**, type: **"Assess my Azure subscription"** |
 | **Copilot CLI** | `gh copilot -p "Assess my Azure subscription using the rules in this project" --allow-all` (requires Node.js 24+) |
 
-👉 [Full setup guide](#getting-started) · [Sample report](samples/sample-report.html) · [Example issues](https://github.com/ricmmartins/azure-environment-advisor/issues)
+👉 [Full setup guide](#getting-started) · [Sample report](https://ricmmartins.github.io/azure-environment-advisor/sample-report.html) · [Example issues](https://github.com/ricmmartins/azure-environment-advisor/issues)
 
 ## The Problem
 
@@ -566,7 +566,7 @@ Open it in any browser (double-click the file, or right-click → "Open with" �
 - **Print to PDF** using your browser's print function (`Ctrl+P`)
 - **Attach it** to a compliance review or architecture decision record
 
-> **What the report looks like:** Open `samples/sample-report.html` in your browser to see an example. Your report will have the same layout with findings specific to your subscription.
+> **What the report looks like:** See the [live sample report](https://ricmmartins.github.io/azure-environment-advisor/sample-report.html) to preview the interactive dashboard. Your report will have the same layout with findings specific to your subscription.
 
 ### Troubleshooting
 
