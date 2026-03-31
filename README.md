@@ -518,13 +518,15 @@ Copilot will read the `.github/copilot-instructions.md` file, connect to Azure v
 
 From the project directory (requires the new Copilot CLI and Node.js v24+):
 ```bash
-# Non-interactive prompt mode
-gh copilot -p "Assess my Azure subscription using the rules in this project"
+# Non-interactive prompt mode (--allow-all auto-approves tool permissions)
+gh copilot -p "Assess my Azure subscription using the rules in this project" --allow-all
 
-# Or start interactive mode
+# Or start interactive mode (you approve each permission manually)
 gh copilot -i
 # Then type: Assess my Azure subscription
 ```
+
+> **Note:** Make sure you're authenticated to Azure (`az login`) before running the assessment.
 
 **What to expect:**
 
