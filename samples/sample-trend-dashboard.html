@@ -3,109 +3,543 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Azure Environment Advisor — Trend Dashboard</title>
+<title>Trend Dashboard — contoso-prod</title>
 <style>
   :root {
-    --bg: #ffffff; --card-bg: #f6f8fa; --text: #1f2328; --text-secondary: #656d76;
-    --border: #d0d7de; --accent: #0969da; --green: #28a745; --red: #d73a4a;
+    --critical: #d13438;
+    --high: #e97548;
+    --medium: #eaa300;
+    --low: #0078d4;
+    --pass: #107c10;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #242424;
+    --text-secondary: #616161;
+    --border: #e0e0e0;
+    --hover: #f5f5f5;
+    --accent: #0078d4;
+    --improving: #107c10;
+    --declining: #d13438;
+    --stable: #616161;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0d1117; --card-bg: #161b22; --text: #e6edf3; --text-secondary: #8b949e;
-      --border: #30363d; --accent: #58a6ff; --green: #3fb950; --red: #f85149;
+      --bg: #1a1a1a;
+      --card: #2d2d2d;
+      --text: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --border: #404040;
+      --hover: #333333;
     }
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-  h2 { font-size: 1.3rem; margin: 1.5rem 0 0.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
-  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; margin-bottom: 1rem; }
-  .summary { font-size: 1.05rem; line-height: 1.6; }
-  .score-big { font-size: 3rem; font-weight: 700; color: var(--accent); }
-  .score-label { font-size: 0.9rem; color: var(--text-secondary); }
-  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }
-  .metric { text-align: center; }
-  .metric-value { font-size: 1.8rem; font-weight: 700; }
-  .metric-label { font-size: 0.8rem; color: var(--text-secondary); }
-  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-  th, td { padding: 0.5rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
-  th { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
-  code { background: var(--card-bg); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.85rem; }
-  .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.85rem; text-align: center; }
-  a { color: var(--accent); text-decoration: none; }
+  body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+  .header { background: linear-gradient(135deg, #0078d4, #005a9e); color: white; padding: 2rem 2rem 1.5rem; }
+  .header h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .header .subtitle { opacity: 0.85; font-size: 0.95rem; }
+  .header .meta { display: flex; gap: 2rem; margin-top: 1rem; font-size: 0.85rem; opacity: 0.8; flex-wrap: wrap; }
+  .header .meta span { display: flex; align-items: center; gap: 0.35rem; }
+
+  .filters { padding: 1rem 2rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .filters label { font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem; }
+  .filter-btn { padding: 0.35rem 0.85rem; border-radius: 20px; border: 1px solid var(--border); background: var(--card); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; color: var(--text); }
+  .filter-btn:hover { background: var(--hover); }
+  .filter-btn.active { background: #0078d4; color: white; border-color: #0078d4; }
+
+  .section { padding: 1.5rem 2rem; }
+  .section h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .card { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 1rem; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; padding: 1.5rem 2rem; margin-top: -1rem; }
+  .summary-card { background: var(--card); border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--border); }
+  .summary-card .count { font-size: 2rem; font-weight: 700; }
+  .summary-card .label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .executive { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--accent); font-size: 0.95rem; line-height: 1.7; }
+  .executive .trend-up { color: var(--improving); font-weight: 600; }
+  .executive .trend-down { color: var(--declining); font-weight: 600; }
+
+  .chart-container { background: var(--card); border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow-x: auto; }
+  .chart-container svg { display: block; margin: 0 auto; }
+
+  .pillar-table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .pillar-table th, .pillar-table td { padding: 0.75rem 1rem; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .pillar-table th { background: var(--hover); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.03em; color: var(--text-secondary); }
+  .pillar-table th:first-child, .pillar-table td:first-child { text-align: left; font-weight: 600; }
+  .pillar-table tr:last-child td { border-bottom: none; }
+  .trend-arrow { font-size: 0.8rem; margin-left: 0.25rem; }
+  .trend-arrow.up { color: var(--improving); }
+  .trend-arrow.down { color: var(--declining); }
+
+  .diff-section { margin-bottom: 1.5rem; }
+  .diff-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  .diff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; }
+  .diff-stat { text-align: center; padding: 0.75rem; background: var(--hover); border-radius: 8px; }
+  .diff-stat .num { font-size: 1.5rem; font-weight: 700; }
+  .diff-stat .lbl { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+
+  .finding-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+  .finding-item:last-child { border-bottom: none; }
+  .sev-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: white; white-space: nowrap; }
+  .sev-badge.critical { background: var(--critical); }
+  .sev-badge.high { background: var(--high); }
+  .sev-badge.medium { background: var(--medium); }
+  .sev-badge.low { background: var(--low); }
+  .finding-text { font-size: 0.85rem; }
+  .finding-rule { font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.5rem; font-weight: 600; }
+
+  .empty-state { text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 0.9rem; }
+
+  .footer { padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 1rem; }
+  .footer a { color: #0078d4; text-decoration: none; }
+
+  @media print {
+    .filters { display: none !important; }
+    body { background: white; }
+    .card, .chart-container, .executive { box-shadow: none; border: 1px solid #ddd; }
+  }
+  @media (max-width: 600px) {
+    .section { padding: 1rem; }
+    .header { padding: 1.5rem 1rem 1rem; }
+    .summary-grid { padding: 1rem; }
+    .filters { padding: 0.75rem 1rem; }
+  }
 </style>
 </head>
 <body>
 
-<h1>📈 Governance Trend Dashboard</h1>
-<p style="color:var(--text-secondary)">Azure Environment Advisor — 2026-01-15 to 2026-04-15 (4 assessments)</p>
-
-<div class="card summary">
-  <p>Over <strong>4 assessments</strong> (2026-01-15 → 2026-04-15),
-    your governance score improved
-    from <strong>52.4</strong> to <strong>81.0</strong>.
-    12 findings were resolved and 0 new findings appeared.</p>
-</div>
-
-<div class="metrics">
-  <div class="metric">
-    <div class="metric-value" style="color:var(--accent)">81.0</div>
-    <div class="metric-label">Current Score</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value">8</div>
-    <div class="metric-label">Open Findings</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value" style="color:var(--green)">12</div>
-    <div class="metric-label">Total Resolved</div>
-  </div>
-  <div class="metric">
-    <div class="metric-value" style="color:var(--red)">8</div>
-    <div class="metric-label">Recurring</div>
+<div class="header">
+  <h1>📈 Azure Environment Trend Dashboard</h1>
+  <div class="subtitle">contoso-prod — Profile: Startup</div>
+  <div class="meta">
+    <span>📊 4 assessments analyzed</span>
+    <span id="meta-range"></span>
   </div>
 </div>
 
-<h2>Score Trend</h2>
-<div class="card"><svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px;">
-    <text x="42" y="180.0" text-anchor="end" fill="var(--text-secondary)" font-size="10" dominant-baseline="middle">42</text><line x1="50" y1="180.0" x2="550" y2="180.0" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/><text x="42" y="140.0" text-anchor="end" fill="var(--text-secondary)" font-size="10" dominant-baseline="middle">55</text><line x1="50" y1="140.0" x2="550" y2="140.0" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/><text x="42" y="100.0" text-anchor="end" fill="var(--text-secondary)" font-size="10" dominant-baseline="middle">67</text><line x1="50" y1="100.0" x2="550" y2="100.0" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/><text x="42" y="60.0" text-anchor="end" fill="var(--text-secondary)" font-size="10" dominant-baseline="middle">79</text><line x1="50" y1="60.0" x2="550" y2="60.0" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/><text x="42" y="20.0" text-anchor="end" fill="var(--text-secondary)" font-size="10" dominant-baseline="middle">91</text><line x1="50" y1="20.0" x2="550" y2="20.0" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/>
-    <polyline points="50.0,147.1 216.7,115.8 383.3,84.5 550.0,52.9" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="50.0" cy="147.1" r="4" fill="var(--accent)"/><text x="50.0" y="147.1-12" text-anchor="middle" fill="var(--text-secondary)" font-size="11">52.4</text><circle cx="216.7" cy="115.8" r="4" fill="var(--accent)"/><text x="216.7" y="115.8-12" text-anchor="middle" fill="var(--text-secondary)" font-size="11">61.9</text><circle cx="383.3" cy="84.5" r="4" fill="var(--accent)"/><text x="383.3" y="84.5-12" text-anchor="middle" fill="var(--text-secondary)" font-size="11">71.4</text><circle cx="550.0" cy="52.9" r="4" fill="var(--accent)"/><text x="550.0" y="52.9-12" text-anchor="middle" fill="var(--text-secondary)" font-size="11">81.0</text>
-    <text x="50.0" y="198" text-anchor="middle" fill="var(--text-secondary)" font-size="10">01-15</text><text x="216.7" y="198" text-anchor="middle" fill="var(--text-secondary)" font-size="10">02-15</text><text x="383.3" y="198" text-anchor="middle" fill="var(--text-secondary)" font-size="10">03-15</text><text x="550.0" y="198" text-anchor="middle" fill="var(--text-secondary)" font-size="10">04-15</text>
-  </svg></div>
-
-<h2>Findings by Severity</h2>
-<div class="card"><svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px;">
-    <rect x="50" y="2" width="10" height="10" fill="#b60205" rx="2"/><text x="64" y="11" fill="var(--text-secondary)" font-size="10">Critical</text><rect x="120" y="2" width="10" height="10" fill="#d93f0b" rx="2"/><text x="134" y="11" fill="var(--text-secondary)" font-size="10">High</text><rect x="190" y="2" width="10" height="10" fill="#f9d0c4" rx="2"/><text x="204" y="11" fill="var(--text-secondary)" font-size="10">Medium</text><rect x="260" y="2" width="10" height="10" fill="#c5def5" rx="2"/><text x="274" y="11" fill="var(--text-secondary)" font-size="10">Low</text>
-    <rect x="92.5" y="140.0" width="40.0" height="40.0" fill="#c5def5" rx="2"><title>Low: 5</title></rect><rect x="92.5" y="84.0" width="40.0" height="56.0" fill="#f9d0c4" rx="2"><title>Medium: 7</title></rect><rect x="92.5" y="44.0" width="40.0" height="40.0" fill="#d93f0b" rx="2"><title>High: 5</title></rect><rect x="92.5" y="20.0" width="40.0" height="24.0" fill="#b60205" rx="2"><title>Critical: 3</title></rect><text x="112.5" y="195" text-anchor="middle" fill="var(--text-secondary)" font-size="10">01-15</text><rect x="217.5" y="148.0" width="40.0" height="32.0" fill="#c5def5" rx="2"><title>Low: 4</title></rect><rect x="217.5" y="92.0" width="40.0" height="56.0" fill="#f9d0c4" rx="2"><title>Medium: 7</title></rect><rect x="217.5" y="60.0" width="40.0" height="32.0" fill="#d93f0b" rx="2"><title>High: 4</title></rect><rect x="217.5" y="52.0" width="40.0" height="8.0" fill="#b60205" rx="2"><title>Critical: 1</title></rect><text x="237.5" y="195" text-anchor="middle" fill="var(--text-secondary)" font-size="10">02-15</text><rect x="342.5" y="156.0" width="40.0" height="24.0" fill="#c5def5" rx="2"><title>Low: 3</title></rect><rect x="342.5" y="108.0" width="40.0" height="48.0" fill="#f9d0c4" rx="2"><title>Medium: 6</title></rect><rect x="342.5" y="84.0" width="40.0" height="24.0" fill="#d93f0b" rx="2"><title>High: 3</title></rect><text x="362.5" y="195" text-anchor="middle" fill="var(--text-secondary)" font-size="10">03-15</text><rect x="467.5" y="156.0" width="40.0" height="24.0" fill="#c5def5" rx="2"><title>Low: 3</title></rect><rect x="467.5" y="124.0" width="40.0" height="32.0" fill="#f9d0c4" rx="2"><title>Medium: 4</title></rect><rect x="467.5" y="116.0" width="40.0" height="8.0" fill="#d93f0b" rx="2"><title>High: 1</title></rect><text x="487.5" y="195" text-anchor="middle" fill="var(--text-secondary)" font-size="10">04-15</text>
-  </svg></div>
-
-<h2>Pillar Breakdown</h2>
-<div class="card">
-  <table>
-    <tr><th>Pillar</th><th>01-15</th><th>02-15</th><th>03-15</th><th>04-15</th></tr>
-    <tr><td><strong>Cost Optimization</strong></td><td>3</td><td>3</td><td>3</td><td>1 <span style="color:#28a745">▼</span></td></tr><tr><td><strong>Governance</strong></td><td>2</td><td>2</td><td>2</td><td>2</td></tr><tr><td><strong>Operations</strong></td><td>5</td><td>4 <span style="color:#28a745">▼</span></td><td>4</td><td>4</td></tr><tr><td><strong>Reliability</strong></td><td>3</td><td>3</td><td>2 <span style="color:#28a745">▼</span></td><td>0 <span style="color:#28a745">▼</span></td></tr><tr><td><strong>Security</strong></td><td>7</td><td>4 <span style="color:#28a745">▼</span></td><td>1 <span style="color:#28a745">▼</span></td><td>1</td></tr>
-  </table>
+<div class="filters">
+  <label>Time range:</label>
+  <button class="filter-btn active" onclick="applyFilter('all')">All</button>
+  <button class="filter-btn" onclick="applyFilter(8)">Last 8</button>
+  <button class="filter-btn" onclick="applyFilter(4)">Last 4</button>
 </div>
 
-<h2>New vs Resolved</h2>
-<div class="card">
-  <table>
-    <tr><th>Period</th><th>🆕 New</th><th>✅ Resolved</th></tr>
-    <tr><td>2026-01-15 → 2026-02-15</td><td style='color:#d73a4a'>+0</td><td style='color:#28a745'>-4</td></tr><tr><td>2026-02-15 → 2026-03-15</td><td style='color:#d73a4a'>+0</td><td style='color:#28a745'>-4</td></tr><tr><td>2026-03-15 → 2026-04-15</td><td style='color:#d73a4a'>+0</td><td style='color:#28a745'>-4</td></tr>
-  </table>
+<div id="executive-section" class="section">
+  <h2>📋 Executive Summary</h2>
+  <div id="executive" class="executive"></div>
 </div>
 
-<h2>Recurring Findings</h2>
-<div class="card">
-  <p style="color:var(--text-secondary); margin-bottom:0.5rem;">Findings present in every assessment (never fixed):</p>
-  <ul><li><code>COST-030</code></li><li><code>GOV-011</code></li><li><code>GOV-012</code></li><li><code>OPS-011</code></li><li><code>OPS-020</code></li><li><code>OPS-021</code></li><li><code>OPS-032</code></li><li><code>SEC-020</code></li></ul>
+<div class="section">
+  <h2>📈 Overall Score Trend</h2>
+  <div id="score-chart" class="chart-container"></div>
+</div>
+
+<div class="section">
+  <h2>📊 Finding Counts by Severity</h2>
+  <div id="bar-chart" class="chart-container"></div>
+</div>
+
+<div class="section">
+  <h2>🏛️ Pillar Score Breakdown</h2>
+  <div id="pillar-table"></div>
+</div>
+
+<div class="section">
+  <h2>🔄 New vs Resolved</h2>
+  <div id="new-resolved"></div>
+</div>
+
+<div class="section">
+  <h2>🔁 Top Recurring Findings</h2>
+  <div id="recurring"></div>
 </div>
 
 <div class="footer">
-  <p>Generated by <strong>Azure Environment Advisor</strong> · <a href="https://github.com/ricmmartins/azure-environment-advisor">GitHub</a></p>
-  <p>Dashboard generated 2026-03-31 15:59 from 4 baseline files</p>
+  Generated by <a href="#">Azure Environment Advisor</a> — Trend Dashboard (Sample)
 </div>
 
+<script>
+var DATA = {
+  "subscription": "contoso-prod",
+  "profile": "startup",
+  "assessments": [
+    {
+      "date": "2026-01-15",
+      "dateLabel": "Jan 15, 2026",
+      "score": 62.0,
+      "findingCount": 20,
+      "passedCount": 22,
+      "severityCounts": {"Critical": 3, "High": 5, "Medium": 8, "Low": 4},
+      "pillarScores": {"Security": 40.0, "Reliability": 60.0, "Cost Optimization": 55.0, "Operational Excellence": 70.0, "Performance": 80.0}
+    },
+    {
+      "date": "2026-02-15",
+      "dateLabel": "Feb 15, 2026",
+      "score": 71.0,
+      "findingCount": 16,
+      "passedCount": 26,
+      "severityCounts": {"Critical": 1, "High": 4, "Medium": 7, "Low": 4},
+      "pillarScores": {"Security": 55.0, "Reliability": 70.0, "Cost Optimization": 65.0, "Operational Excellence": 78.0, "Performance": 85.0}
+    },
+    {
+      "date": "2026-03-15",
+      "dateLabel": "Mar 15, 2026",
+      "score": 78.0,
+      "findingCount": 12,
+      "passedCount": 30,
+      "severityCounts": {"Critical": 0, "High": 3, "Medium": 6, "Low": 3},
+      "pillarScores": {"Security": 70.0, "Reliability": 80.0, "Cost Optimization": 75.0, "Operational Excellence": 85.0, "Performance": 90.0}
+    },
+    {
+      "date": "2026-04-15",
+      "dateLabel": "Apr 15, 2026",
+      "score": 85.0,
+      "findingCount": 8,
+      "passedCount": 34,
+      "severityCounts": {"Critical": 0, "High": 1, "Medium": 5, "Low": 2},
+      "pillarScores": {"Security": 85.0, "Reliability": 90.0, "Cost Optimization": 85.0, "Operational Excellence": 92.0, "Performance": 95.0}
+    }
+  ],
+  "diffs": [
+    {
+      "fromDate": "Jan 15, 2026",
+      "toDate": "Feb 15, 2026",
+      "new": [
+        {"rule_id": "COST-012", "title": "Underutilized App Service plans", "severity": "Medium"},
+        {"rule_id": "OPS-008", "title": "No auto-scaling configured", "severity": "Low"}
+      ],
+      "resolved": [
+        {"rule_id": "SEC-001", "title": "Defender for Cloud not enabled", "severity": "Critical"},
+        {"rule_id": "SEC-010", "title": "Public database endpoints", "severity": "Critical"},
+        {"rule_id": "SEC-015", "title": "Storage accounts allow public access", "severity": "High"},
+        {"rule_id": "OPS-001", "title": "No diagnostic settings configured", "severity": "High"},
+        {"rule_id": "COST-008", "title": "Oversized VM instances", "severity": "Medium"},
+        {"rule_id": "REL-005", "title": "No availability zones for App Service", "severity": "Medium"}
+      ],
+      "escalated": [],
+      "deEscalated": [
+        {"rule_id": "SEC-020", "title": "Weak TLS configuration", "from": "High", "to": "Medium"}
+      ]
+    },
+    {
+      "fromDate": "Feb 15, 2026",
+      "toDate": "Mar 15, 2026",
+      "new": [
+        {"rule_id": "GOV-003", "title": "Missing resource locks on production resources", "severity": "Medium"}
+      ],
+      "resolved": [
+        {"rule_id": "SEC-025", "title": "Key Vault soft delete not enabled", "severity": "Critical"},
+        {"rule_id": "COST-012", "title": "Underutilized App Service plans", "severity": "Medium"},
+        {"rule_id": "REL-010", "title": "No geo-redundancy for storage", "severity": "High"},
+        {"rule_id": "OPS-008", "title": "No auto-scaling configured", "severity": "Low"},
+        {"rule_id": "PERF-003", "title": "No CDN for static assets", "severity": "Medium"}
+      ],
+      "escalated": [],
+      "deEscalated": [
+        {"rule_id": "SEC-020", "title": "Weak TLS configuration", "from": "Medium", "to": "Low"}
+      ]
+    },
+    {
+      "fromDate": "Mar 15, 2026",
+      "toDate": "Apr 15, 2026",
+      "new": [],
+      "resolved": [
+        {"rule_id": "SEC-030", "title": "NSG rules too permissive", "severity": "High"},
+        {"rule_id": "GOV-003", "title": "Missing resource locks on production resources", "severity": "Medium"},
+        {"rule_id": "REL-008", "title": "No health probes on load balancer", "severity": "High"},
+        {"rule_id": "SEC-020", "title": "Weak TLS configuration", "severity": "Low"}
+      ],
+      "escalated": [],
+      "deEscalated": []
+    }
+  ],
+  "recurring": [
+    {"rule_id": "OPS-005", "title": "No centralized log analytics workspace", "severity": "High", "pillar": "Operational Excellence"},
+    {"rule_id": "COST-010", "title": "Orphaned managed disks", "severity": "Medium", "pillar": "Cost Optimization"},
+    {"rule_id": "SEC-035", "title": "No network watcher enabled", "severity": "Medium", "pillar": "Security"},
+    {"rule_id": "REL-001", "title": "Azure SQL not zone-redundant", "severity": "Low", "pillar": "Reliability"}
+  ]
+};
+
+var currentFilter = 'all';
+
+function getFiltered(range) {
+  var a = DATA.assessments;
+  if (range === 'all' || a.length <= range) return { assessments: a, diffs: DATA.diffs, offset: 0 };
+  var offset = a.length - range;
+  return {
+    assessments: a.slice(offset),
+    diffs: DATA.diffs.slice(Math.max(0, offset - 1)),
+    offset: offset
+  };
+}
+
+function applyFilter(range) {
+  currentFilter = range;
+  document.querySelectorAll('.filter-btn').forEach(function(b) {
+    b.classList.toggle('active',
+      (range === 'all' && b.textContent.trim() === 'All') ||
+      (range === 8 && b.textContent.trim() === 'Last 8') ||
+      (range === 4 && b.textContent.trim() === 'Last 4'));
+  });
+  renderAll();
+}
+
+function renderAll() {
+  var f = getFiltered(currentFilter);
+  renderMeta(f.assessments);
+  renderExecutive(f.assessments, f.diffs);
+  renderLineChart(f.assessments);
+  renderBarChart(f.assessments);
+  renderPillarTable(f.assessments);
+  renderNewResolved(f.diffs);
+  renderRecurring();
+}
+
+function renderMeta(assessments) {
+  var el = document.getElementById('meta-range');
+  if (assessments.length >= 2) {
+    el.textContent = '\uD83D\uDCC5 ' + assessments[0].dateLabel + ' \u2192 ' + assessments[assessments.length - 1].dateLabel;
+  } else if (assessments.length === 1) {
+    el.textContent = '\uD83D\uDCC5 ' + assessments[0].dateLabel;
+  }
+}
+
+function renderExecutive(assessments, diffs) {
+  var el = document.getElementById('executive');
+  var n = assessments.length;
+  if (n === 0) { el.innerHTML = '<p class="empty-state">No assessment data available.</p>'; return; }
+  if (n === 1) {
+    var a = assessments[0];
+    var total = a.findingCount + a.passedCount;
+    el.innerHTML = '<p>Single assessment on <strong>' + a.dateLabel + '</strong>. ' +
+      'Score: <strong>' + a.score.toFixed(1) + '%</strong> with ' +
+      a.findingCount + ' finding' + (a.findingCount !== 1 ? 's' : '') + ' across ' + total + ' checks. ' +
+      'Add more assessments to see trends.</p>';
+    return;
+  }
+  var first = assessments[0], last = assessments[n - 1];
+  var diff = last.score - first.score;
+  var trend = diff > 2 ? 'improved' : diff < -2 ? 'declined' : 'remained stable';
+  var cls = diff > 2 ? 'trend-up' : diff < -2 ? 'trend-down' : '';
+  var totalNew = 0, totalResolved = 0;
+  diffs.forEach(function(d) { totalNew += d['new'].length; totalResolved += d.resolved.length; });
+  el.innerHTML = '<p>Over <strong>' + n + ' assessments</strong> (' + first.dateLabel + ' \u2192 ' + last.dateLabel + '), ' +
+    'your score <span class="' + cls + '">' + trend + ' from ' + first.score.toFixed(1) + '% to ' + last.score.toFixed(1) + '%</span>. ' +
+    totalResolved + ' finding' + (totalResolved !== 1 ? 's were' : ' was') + ' resolved and ' +
+    totalNew + ' new finding' + (totalNew !== 1 ? 's' : '') + ' appeared.' +
+    (last.severityCounts.Critical > 0 ? ' <strong style="color:var(--critical)">' + last.severityCounts.Critical + ' critical finding' + (last.severityCounts.Critical !== 1 ? 's' : '') + ' remain.</strong>' : '') +
+    '</p>';
+}
+
+function renderLineChart(assessments) {
+  var el = document.getElementById('score-chart');
+  var n = assessments.length;
+  if (n === 0) { el.innerHTML = '<p class="empty-state">No data.</p>'; return; }
+
+  var W = 700, H = 280;
+  var pL = 55, pR = 20, pT = 30, pB = 50;
+  var cW = W - pL - pR, cH = H - pT - pB;
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;">';
+  svg += '<defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">';
+  svg += '<stop offset="0%" stop-color="#0078d4" stop-opacity="0.15"/>';
+  svg += '<stop offset="100%" stop-color="#0078d4" stop-opacity="0.01"/>';
+  svg += '</linearGradient></defs>';
+
+  for (var pct = 0; pct <= 100; pct += 25) {
+    var gy = pT + cH - (pct / 100) * cH;
+    svg += '<line x1="' + pL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - pR) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4"/>';
+    svg += '<text x="' + (pL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" fill="var(--text-secondary)" font-size="11">' + pct + '</text>';
+  }
+
+  var pts = assessments.map(function(a, i) {
+    return {
+      x: n > 1 ? pL + i * cW / (n - 1) : pL + cW / 2,
+      y: pT + cH - (a.score / 100) * cH,
+      score: a.score,
+      label: a.dateLabel
+    };
+  });
+
+  if (n > 1) {
+    var area = 'M ' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+    for (var i = 1; i < pts.length; i++) area += ' L ' + pts[i].x.toFixed(1) + ',' + pts[i].y.toFixed(1);
+    area += ' L ' + pts[pts.length - 1].x.toFixed(1) + ',' + (pT + cH) + ' L ' + pts[0].x.toFixed(1) + ',' + (pT + cH) + ' Z';
+    svg += '<path d="' + area + '" fill="url(#lg)"/>';
+    var line = 'M ' + pts.map(function(p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' L ');
+    svg += '<path d="' + line + '" fill="none" stroke="#0078d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  pts.forEach(function(p) {
+    svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="#0078d4" stroke="var(--card)" stroke-width="2"/>';
+    svg += '<text x="' + p.x.toFixed(1) + '" y="' + (p.y - 12).toFixed(1) + '" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="600">' + p.score.toFixed(1) + '%</text>';
+    svg += '<text x="' + p.x.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--text-secondary)" font-size="10">' + p.label + '</text>';
+  });
+
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function renderBarChart(assessments) {
+  var el = document.getElementById('bar-chart');
+  var n = assessments.length;
+  if (n === 0) { el.innerHTML = '<p class="empty-state">No data.</p>'; return; }
+
+  var W = 700, H = 300;
+  var pL = 55, pR = 20, pT = 35, pB = 50;
+  var cW = W - pL - pR, cH = H - pT - pB;
+
+  var sevOrder = ['Critical', 'High', 'Medium', 'Low'];
+  var sevColors = { Critical: 'var(--critical)', High: 'var(--high)', Medium: 'var(--medium)', Low: 'var(--low)' };
+
+  var maxTotal = 1;
+  assessments.forEach(function(a) {
+    var t = sevOrder.reduce(function(s, k) { return s + (a.severityCounts[k] || 0); }, 0);
+    if (t > maxTotal) maxTotal = t;
+  });
+  var niceMax = Math.ceil(maxTotal / 5) * 5;
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;">';
+
+  var lx = pL;
+  sevOrder.forEach(function(sev) {
+    svg += '<rect x="' + lx + '" y="8" width="12" height="12" rx="2" fill="' + sevColors[sev] + '"/>';
+    svg += '<text x="' + (lx + 16) + '" y="18" fill="var(--text-secondary)" font-size="10">' + sev + '</text>';
+    lx += sev.length * 6.5 + 28;
+  });
+
+  for (var frac = 0; frac <= 1.001; frac += 0.25) {
+    var gy = pT + cH - frac * cH;
+    var val = Math.round(niceMax * frac);
+    svg += '<line x1="' + pL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - pR) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5"' + (frac > 0 ? ' stroke-dasharray="4,4"' : '') + '/>';
+    svg += '<text x="' + (pL - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" fill="var(--text-secondary)" font-size="11">' + val + '</text>';
+  }
+
+  var barW = Math.min(60, (cW - 20) / n - 10);
+  assessments.forEach(function(a, i) {
+    var cx = pL + (i + 0.5) * cW / n;
+    var bx = cx - barW / 2;
+    var yOff = 0;
+    var total = 0;
+    sevOrder.forEach(function(sev) {
+      var count = a.severityCounts[sev] || 0;
+      total += count;
+      if (count === 0) return;
+      var bh = (count / niceMax) * cH;
+      var by = pT + cH - yOff - bh;
+      svg += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + sevColors[sev] + '"/>';
+      if (bh > 14) svg += '<text x="' + cx.toFixed(1) + '" y="' + (by + bh / 2 + 4).toFixed(1) + '" text-anchor="middle" fill="white" font-size="10" font-weight="600">' + count + '</text>';
+      yOff += bh;
+    });
+    svg += '<text x="' + cx.toFixed(1) + '" y="' + (pT + cH - yOff - 6).toFixed(1) + '" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600">' + total + '</text>';
+    svg += '<text x="' + cx.toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle" fill="var(--text-secondary)" font-size="10">' + a.dateLabel + '</text>';
+  });
+
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function renderPillarTable(assessments) {
+  var el = document.getElementById('pillar-table');
+  var n = assessments.length;
+  if (n === 0) { el.innerHTML = '<p class="empty-state">No data.</p>'; return; }
+
+  var allPillars = {};
+  assessments.forEach(function(a) { Object.keys(a.pillarScores).forEach(function(p) { allPillars[p] = true; }); });
+  var pillars = Object.keys(allPillars).sort();
+
+  var html = '<table class="pillar-table"><thead><tr><th>Pillar</th>';
+  assessments.forEach(function(a) { html += '<th>' + a.dateLabel + '</th>'; });
+  html += '<th>Trend</th></tr></thead><tbody>';
+
+  pillars.forEach(function(pillar) {
+    html += '<tr><td>' + pillar + '</td>';
+    var scores = assessments.map(function(a) { return a.pillarScores[pillar] !== undefined ? a.pillarScores[pillar] : null; });
+    scores.forEach(function(s) {
+      if (s === null) { html += '<td>\u2014</td>'; return; }
+      var color = s >= 80 ? 'var(--pass)' : s >= 60 ? 'var(--medium)' : s >= 40 ? 'var(--high)' : 'var(--critical)';
+      html += '<td style="color:' + color + ';font-weight:600">' + s.toFixed(1) + '%</td>';
+    });
+    var valid = scores.filter(function(s) { return s !== null; });
+    if (valid.length >= 2) {
+      var diff = valid[valid.length - 1] - valid[0];
+      if (diff > 2) html += '<td><span class="trend-arrow up">\u25b2 +' + diff.toFixed(1) + '</span></td>';
+      else if (diff < -2) html += '<td><span class="trend-arrow down">\u25bc ' + diff.toFixed(1) + '</span></td>';
+      else html += '<td><span class="trend-arrow" style="color:var(--stable)">\u2014 stable</span></td>';
+    } else html += '<td>\u2014</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderNewResolved(diffs) {
+  var el = document.getElementById('new-resolved');
+  if (!diffs || diffs.length === 0) {
+    el.innerHTML = '<div class="card"><p class="empty-state">Need at least 2 assessments to compare.</p></div>';
+    return;
+  }
+  var html = '';
+  diffs.forEach(function(d) {
+    html += '<div class="card diff-section">';
+    html += '<h3>' + d.fromDate + ' \u2192 ' + d.toDate + '</h3>';
+    html += '<div class="diff-grid">';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--critical)">' + d['new'].length + '</div><div class="lbl">New</div></div>';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--pass)">' + d.resolved.length + '</div><div class="lbl">Resolved</div></div>';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--high)">' + d.escalated.length + '</div><div class="lbl">Escalated</div></div>';
+    html += '<div class="diff-stat"><div class="num" style="color:var(--low)">' + d.deEscalated.length + '</div><div class="lbl">De-escalated</div></div>';
+    html += '</div>';
+
+    if (d['new'].length > 0) {
+      html += '<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">NEW FINDINGS:</strong></div>';
+      d['new'].forEach(function(f) {
+        var cls = f.severity ? f.severity.toLowerCase() : 'low';
+        html += '<div class="finding-item"><span class="sev-badge ' + cls + '">' + (f.severity || '') + '</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + '</span></div>';
+      });
+    }
+    if (d.resolved.length > 0) {
+      html += '<div style="margin-top:0.75rem;margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">RESOLVED:</strong></div>';
+      d.resolved.forEach(function(f) {
+        html += '<div class="finding-item"><span style="color:var(--pass);font-weight:600;font-size:0.85rem">\u2713</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + '</span></div>';
+      });
+    }
+    if (d.escalated.length > 0) {
+      html += '<div style="margin-top:0.75rem;margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">ESCALATED:</strong></div>';
+      d.escalated.forEach(function(f) {
+        html += '<div class="finding-item"><span style="color:var(--high);font-weight:600;font-size:0.85rem">\u2b06</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + ' (' + f.from + ' \u2192 ' + f.to + ')</span></div>';
+      });
+    }
+    if (d.deEscalated.length > 0) {
+      html += '<div style="margin-top:0.75rem;margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--text-secondary)">DE-ESCALATED:</strong></div>';
+      d.deEscalated.forEach(function(f) {
+        html += '<div class="finding-item"><span style="color:var(--pass);font-weight:600;font-size:0.85rem">\u2b07</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + ' (' + f.from + ' \u2192 ' + f.to + ')</span></div>';
+      });
+    }
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function renderRecurring() {
+  var el = document.getElementById('recurring');
+  var r = DATA.recurring;
+  if (!r || r.length === 0) {
+    el.innerHTML = '<div class="card"><p class="empty-state">No findings appear in every assessment. Great improvement! \uD83C\uDF89</p></div>';
+    return;
+  }
+  var html = '<div class="card"><p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem;">These findings have appeared in <strong>every</strong> assessment and have never been resolved:</p>';
+  r.forEach(function(f) {
+    var cls = f.severity ? f.severity.toLowerCase() : 'low';
+    html += '<div class="finding-item"><span class="sev-badge ' + cls + '">' + (f.severity || '') + '</span><span class="finding-rule">' + f.rule_id + '</span><span class="finding-text">' + (f.title || '') + '</span><span style="font-size:0.75rem;color:var(--text-secondary);margin-left:auto">' + (f.pillar || '') + '</span></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+renderAll();
+</script>
 </body>
 </html>
