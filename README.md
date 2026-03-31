@@ -461,13 +461,18 @@ Then create `.vscode/mcp.json` with this content:
 
 > **How VS Code picks this up:** VS Code automatically detects `.vscode/mcp.json` when you open the project folder. No extra settings needed — just restart VS Code after creating the file.
 
-**Alternative — For GitHub Copilot CLI (`gh copilot`):**
+**Alternative — For GitHub Copilot CLI:**
 
-First, install the GitHub CLI and the Copilot extension if you haven't:
+> **Important:** The Copilot CLI with agent mode requires the **new** Copilot CLI, not the legacy `gh-copilot` extension. If you have the old extension installed, remove it first:
+> ```bash
+> gh extension remove gh-copilot
+> ```
+
+Install the GitHub CLI if you haven't, then run `gh copilot` — it will automatically download the new Copilot CLI:
 ```bash
 # Install GitHub CLI: https://cli.github.com/
 gh auth login
-gh extension install github/gh-copilot
+gh copilot  # Downloads the new Copilot CLI on first run
 ```
 
 Then create the MCP config file at:
@@ -511,9 +516,14 @@ Copilot will read the `.github/copilot-instructions.md` file, connect to Azure v
 
 **Alternative — In GitHub Copilot CLI:**
 
-From the project directory:
+From the project directory (requires the new Copilot CLI, not the legacy extension):
 ```bash
+# Non-interactive prompt mode
 gh copilot -- -p "Assess my Azure subscription using the rules in this project" --allow-all
+
+# Or start interactive mode
+gh copilot
+# Then type: Assess my Azure subscription
 ```
 
 **What to expect:**
