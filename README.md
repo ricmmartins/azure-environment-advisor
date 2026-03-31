@@ -649,16 +649,25 @@ python scripts/create-issues-from-report.py --report assessment-report.html
 # Create issues for all severities
 python scripts/create-issues-from-report.py --report assessment-report.html --severity Critical High Medium Low
 
+# Group issues under a milestone (great for tracking assessment runs)
+python scripts/create-issues-from-report.py --report assessment-report.html --milestone "Assessment 2026-03-31"
+
 # Add custom labels
 python scripts/create-issues-from-report.py --report assessment-report.html --labels "sprint-1,team-platform"
 ```
 
 Each issue includes:
 - Rule ID and title
-- Severity and pillar labels
+- Severity and pillar labels (with color coding and descriptions)
 - Affected resources
 - Remediation guidance
 - Microsoft Learn documentation links
+
+**Filtering tips:** Use GitHub's label filters to slice findings:
+- `label:severity:critical` — show only critical findings
+- `label:pillar:security` — show only security findings
+- `label:assessment-finding` — show all assessment findings (vs bug reports, feature requests)
+- Use `--milestone` to group findings by assessment date for tracking progress over time
 
 > **Requirement:** GitHub CLI (`gh`) must be installed and authenticated.
 >
