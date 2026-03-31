@@ -1,6 +1,6 @@
 # Azure Environment Advisor
 
-An AI-powered agent that connects to your Azure subscription, assesses your environment against best practices, and generates an interactive HTML report with findings and Microsoft Learn documentation links — tailored to your company's stage and architecture.
+An AI-powered agent that connects to your Azure subscription(s), assesses your environment against best practices, and generates an interactive HTML report with findings and Microsoft Learn documentation links — tailored to your company's stage and architecture.
 
 ## Quick Start
 
@@ -338,7 +338,8 @@ azure-environment-advisor/
 │   ├── validate-rules.py              # Rule file validation (CI + local)
 │   ├── create-issues-from-report.py   # Create GitHub Issues from findings
 │   ├── compare-assessments.py         # Drift detection between baselines
-│   └── generate-trend-dashboard.py    # Trend dashboard from multiple baselines
+│   ├── generate-trend-dashboard.py    # Trend dashboard from multiple baselines
+│   └── generate-badge.py             # Shields.io governance score badge
 ├── baselines/
 │   ├── baseline-schema.json           # JSON schema for assessment baselines
 │   └── example-baseline.json          # Example baseline for reference
@@ -347,6 +348,8 @@ azure-environment-advisor/
 ├── samples/
 │   ├── sample-report.html             # Example assessment report
 │   └── sample-trend-dashboard.html    # Example trend dashboard
+├── badge/
+│   └── score.json                     # Shields.io endpoint badge (auto-generated)
 └── README.md
 ```
 
@@ -669,35 +672,99 @@ Automate assessments with two GitHub Actions workflows:
 
 ### Scheduled Assessment (`scheduled-assessment.yml`)
 
-Runs weekly (or on demand) and:
+Runs weekly (or on demand) and supports **single or multiple subscriptions**:
 1. Logs into Azure using service principal credentials
-2. Runs Resource Graph queries to discover resources
-3. Generates a JSON baseline in `baselines/`
-4. Compares with the previous baseline (drift detection)
-5. Generates a trend dashboard
-6. Creates GitHub Issues for new findings
-7. Commits baseline + dashboard to the repo
-8. Posts a summary to the workflow run
+2. Iterates over all configured subscriptions
+3. Runs Resource Graph queries per subscription
+4. Generates a JSON baseline per subscription in `baselines/`
+5. Compares with previous baselines per subscription (drift detection)
+6. Generates a trend dashboard and score badge
+7. Creates GitHub Issues for new findings
+8. Commits baselines + dashboard + badge to the repo
+9. Posts a multi-subscription summary to the workflow run
 
 **Setup:**
 ```bash
-# 1. Create a service principal with Reader role
+# 1. Create a service principal with Reader role on each subscription
 az ad sp create-for-rbac --name "advisor-ci" --role Reader \
-  --scopes /subscriptions/<sub-id> --sdk-auth
+  --scopes /subscriptions/<sub-id-1> /subscriptions/<sub-id-2> --sdk-auth
 
 # 2. Add the JSON output as a GitHub secret
 #    Settings → Secrets → Actions → New secret → AZURE_CREDENTIALS
 
-# 3. Add your subscription ID as a secret
-#    AZURE_SUBSCRIPTION_ID = <your-subscription-id>
+# 3. Add subscription IDs (pick one):
+#    Single sub:  AZURE_SUBSCRIPTION_ID = <subscription-id>
+#    Multi-sub:   AZURE_SUBSCRIPTION_IDS = <sub-id-1>,<sub-id-2>,<sub-id-3>
 ```
+
+You can also pass subscription IDs directly when triggering manually — use the `subscription_ids` input (comma-separated).
 
 ### Drift Detection (`drift-detection.yml`)
 
 Triggers automatically after each scheduled assessment:
-- Compares the two most recent baselines
+- Compares the two most recent baselines **per subscription**
 - Creates a GitHub Issue if new findings or escalations are detected
 - Posts a summary with counts: new, resolved, escalated
+
+## Multi-Subscription Assessment
+
+Assess multiple Azure subscriptions in a single session:
+
+### With Copilot CLI
+
+```bash
+# Assess multiple subscriptions
+gh copilot -p "Assess subscriptions sub-id-1, sub-id-2, sub-id-3" --allow-all
+
+# Assess all subscriptions under a management group
+gh copilot -p "Assess all subscriptions under management group 'Production'" --allow-all
+```
+
+The agent generates:
+- **One report + one baseline per subscription** (separate, comparable files)
+- **A cross-subscription summary** showing:
+  - Total findings by severity across all subscriptions
+  - Which subscription has the most critical issues
+  - Common findings across multiple subscriptions (systemic issues)
+  - Overall governance score (average)
+
+### With GitHub Actions
+
+Set `AZURE_SUBSCRIPTION_IDS` as a comma-separated secret:
+
+```
+# Secret value:
+00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002
+```
+
+Each subscription gets its own baseline (`baselines/baseline-{sub-name}-{date}.json`), and drift detection runs per subscription.
+
+## Score Badge
+
+Display your governance score in your README with a shields.io badge:
+
+```bash
+# Generate from the latest baseline
+python scripts/generate-badge.py --baselines-dir baselines/ --output badge/score.json
+
+# Generate from a specific baseline
+python scripts/generate-badge.py --baseline baselines/baseline-contoso-prod-2026-03-31.json --output badge/score.json
+```
+
+Then add this to your repo's README:
+
+```markdown
+![Governance Score](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/main/badge/score.json)
+```
+
+| Score | Color |
+|-------|-------|
+| ≥ 80% | 🟢 Green |
+| ≥ 60% | 🟡 Yellow |
+| ≥ 40% | 🟠 Orange |
+| < 40% | 🔴 Red |
+
+The badge is automatically updated by the GitHub Actions pipeline after each assessment.
 
 ## Auto-Create GitHub Issues
 

@@ -25,11 +25,27 @@ You always operate in **read-only mode**. You never modify, create, or delete an
 
 ## Phase 1: Connect
 
-When the user provides a subscription ID or name:
+When the user provides one or more subscription IDs or names:
 
-1. Use the Azure MCP Server to validate connectivity
-2. Confirm the subscription name and ID with the user
+1. Use the Azure MCP Server to validate connectivity to each subscription
+2. Confirm the subscription name(s) and ID(s) with the user
 3. Proceed to discovery
+
+**Multi-subscription mode:**
+- If the user provides multiple subscriptions (comma-separated, a list, or says "all"), assess each one sequentially
+- Generate a **separate report and baseline per subscription** (keeps files focused and comparable)
+- At the end, generate a **combined summary** showing cross-subscription totals and top findings
+- Name files: `assessment-{subscription-name}-{YYYY-MM-DD}.html` and `baselines/baseline-{subscription-name}-{YYYY-MM-DD}.json`
+
+**Management group scope:**
+- If the user provides a management group ID instead of subscription IDs, first enumerate all subscriptions under it:
+  ```kql
+  resourcecontainers
+  | where type == 'microsoft.resources/subscriptions'
+  | project subscriptionId, name, properties.displayName
+  ```
+- Confirm the list with the user before proceeding
+- Then assess each subscription as above
 
 If no subscription is specified, ask the user which subscription to assess.
 
@@ -361,8 +377,14 @@ The Azure MCP Server exposes its tools automatically via the Model Context Proto
 - Include profile-appropriate recommendations (don't suggest PIM for a 5-person startup)
 
 ### Scope
-- **Assess one subscription at a time.** If the user has multiple subscriptions, ask which one to assess and generate a separate report for each.
-- If the user asks to assess "everything" or "all subscriptions," explain that multi-subscription assessment is on the roadmap and recommend starting with the most critical subscription.
+- **Single subscription:** Generate one report + one baseline per subscription.
+- **Multiple subscriptions:** Assess each subscription sequentially, generating separate reports and baselines. After all assessments, generate a cross-subscription summary showing:
+  - Total findings by severity across all subscriptions
+  - Which subscription has the most critical/high findings
+  - Common findings that appear in multiple subscriptions (systemic issues)
+  - Overall governance score (average across subscriptions)
+- **Management group:** Enumerate subscriptions under the management group, then assess each one.
+- If the user asks to assess "everything" or "all subscriptions," enumerate accessible subscriptions and confirm before proceeding.
 
 ### Error Handling & Edge Cases
 

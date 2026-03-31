@@ -6,8 +6,8 @@ on:
     - cron: '0 8 * * 1'
   workflow_dispatch:
     inputs:
-      subscription_id:
-        description: 'Azure Subscription ID to assess (overrides secret)'
+      subscription_ids:
+        description: 'Comma-separated Azure Subscription IDs (overrides secret). Leave empty to use AZURE_SUBSCRIPTION_IDS secret.'
         required: false
         type: string
       profile:
@@ -30,9 +30,6 @@ on:
         required: false
         type: boolean
         default: true
-
-env:
-  AZURE_SUBSCRIPTION_ID: ${{ inputs.subscription_id || secrets.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
   assess:
@@ -58,100 +55,125 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Validate subscription access
+      - name: Resolve subscription list
+        id: subs
         run: |
-          SUB_ID="${{ env.AZURE_SUBSCRIPTION_ID }}"
-          if [ -z "$SUB_ID" ]; then
-            echo "::error::No subscription ID provided. Set AZURE_SUBSCRIPTION_ID secret or provide via workflow_dispatch input."
+          # Support: single sub (AZURE_SUBSCRIPTION_ID), multi-sub (AZURE_SUBSCRIPTION_IDS), or workflow input
+          RAW="${{ inputs.subscription_ids || secrets.AZURE_SUBSCRIPTION_IDS || secrets.AZURE_SUBSCRIPTION_ID }}"
+          if [ -z "$RAW" ]; then
+            echo "::error::No subscription IDs provided. Set AZURE_SUBSCRIPTION_ID or AZURE_SUBSCRIPTION_IDS secret, or provide via workflow_dispatch input."
             exit 1
           fi
-          echo "Validating access to subscription $SUB_ID..."
-          az account show --subscription "$SUB_ID" -o table
-          echo "subscription_id=$SUB_ID" >> $GITHUB_ENV
 
-      - name: Run Resource Graph queries
-        id: discover
+          # Normalize: trim spaces, replace newlines with commas
+          SUBS=$(echo "$RAW" | tr '\n' ',' | sed 's/,,*/,/g' | sed 's/^,//;s/,$//')
+          echo "subscription_list=$SUBS" >> $GITHUB_OUTPUT
+
+          # Count and validate each subscription
+          IFS=',' read -ra SUB_ARRAY <<< "$SUBS"
+          echo "subscription_count=${#SUB_ARRAY[@]}" >> $GITHUB_OUTPUT
+          echo "## Subscriptions to assess: ${#SUB_ARRAY[@]}" >> $GITHUB_STEP_SUMMARY
+          for SUB in "${SUB_ARRAY[@]}"; do
+            SUB=$(echo "$SUB" | xargs)  # trim whitespace
+            echo "Validating $SUB..."
+            az account show --subscription "$SUB" -o table || {
+              echo "::warning::Cannot access subscription $SUB — skipping"
+            }
+          done
+
+      - name: Assess each subscription
+        id: assess
+        env:
+          TIMESTAMP: ${{ github.run_id }}
         run: |
           TIMESTAMP=$(date +%Y-%m-%d)
           echo "timestamp=$TIMESTAMP" >> $GITHUB_ENV
-          echo "## Discovery Phase" >> $GITHUB_STEP_SUMMARY
+          SUBS="${{ steps.subs.outputs.subscription_list }}"
+          IFS=',' read -ra SUB_ARRAY <<< "$SUBS"
 
-          # Resource inventory
-          echo "Running resource inventory query..."
-          az graph query -q "
-            resources
-            | where subscriptionId == '${{ env.subscription_id }}'
-            | summarize count() by type, location
-            | order by count_ desc
-          " --subscriptions "${{ env.subscription_id }}" -o json > /tmp/inventory.json
-          echo "Resources found: $(cat /tmp/inventory.json | python3 -c 'import json,sys; data=json.load(sys.stdin); print(sum(r["count_"] for r in data.get("data",[])))')"
+          BASELINE_PATHS=""
+          TOTAL_FINDINGS=0
+          TOTAL_RESOURCES=0
+          SUB_SUMMARIES=""
 
-          # Security posture
-          echo "Checking Defender for Cloud..."
-          az graph query -q "
-            securityresources
-            | where type == 'microsoft.security/securescores'
-            | where subscriptionId == '${{ env.subscription_id }}'
-            | project name, current=properties.score.current, max=properties.score.max
-          " --subscriptions "${{ env.subscription_id }}" -o json > /tmp/security.json || true
+          for SUB_ID in "${SUB_ARRAY[@]}"; do
+            SUB_ID=$(echo "$SUB_ID" | xargs)
+            echo "========================================="
+            echo "Assessing subscription: $SUB_ID"
+            echo "========================================="
 
-          # Policy compliance
-          echo "Checking policy compliance..."
-          az graph query -q "
-            policyresources
-            | where type == 'microsoft.policyinsights/policystates'
-            | where subscriptionId == '${{ env.subscription_id }}'
-            | where properties.complianceState == 'NonCompliant'
-            | summarize count() by tostring(properties.policyDefinitionName)
-          " --subscriptions "${{ env.subscription_id }}" -o json > /tmp/compliance.json || true
+            # Get subscription display name
+            SUB_NAME=$(az account show --subscription "$SUB_ID" --query "name" -o tsv 2>/dev/null || echo "$SUB_ID")
+            SUB_SLUG=$(echo "$SUB_NAME" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
 
-          echo "Discovery complete" >> $GITHUB_STEP_SUMMARY
+            # Resource inventory
+            echo "Running resource inventory query..."
+            az graph query -q "
+              resources
+              | where subscriptionId == '$SUB_ID'
+              | summarize count() by type, location
+              | order by count_ desc
+            " --subscriptions "$SUB_ID" -o json > /tmp/inventory-${SUB_SLUG}.json
 
-      - name: Build assessment baseline
-        id: baseline
-        run: |
-          python3 - <<'PYTHON'
-          import json, glob, os, re
+            # Security posture
+            echo "Checking Defender for Cloud..."
+            az graph query -q "
+              securityresources
+              | where type == 'microsoft.security/securescores'
+              | where subscriptionId == '$SUB_ID'
+              | project name, current=properties.score.current, max=properties.score.max
+            " --subscriptions "$SUB_ID" -o json > /tmp/security-${SUB_SLUG}.json || true
+
+            # Policy compliance
+            echo "Checking policy compliance..."
+            az graph query -q "
+              policyresources
+              | where type == 'microsoft.policyinsights/policystates'
+              | where subscriptionId == '$SUB_ID'
+              | where properties.complianceState == 'NonCompliant'
+              | summarize count() by tostring(properties.policyDefinitionName)
+            " --subscriptions "$SUB_ID" -o json > /tmp/compliance-${SUB_SLUG}.json || true
+
+            # Build baseline for this subscription
+            python3 - <<PYTHON
+          import json, os, re
           from datetime import datetime
 
-          timestamp = os.environ.get("timestamp", datetime.now().strftime("%Y-%m-%d"))
-          sub_id = os.environ.get("subscription_id", "unknown")
+          sub_id = "$SUB_ID"
+          sub_name = "$SUB_NAME"
+          sub_slug = "$SUB_SLUG"
+          timestamp = "$TIMESTAMP"
 
-          # Load discovery data
           def load_json(path):
               try:
                   with open(path) as f:
                       return json.load(f)
               except: return {}
 
-          inventory = load_json("/tmp/inventory.json")
-          security = load_json("/tmp/security.json")
-          compliance = load_json("/tmp/compliance.json")
+          inventory = load_json(f"/tmp/inventory-{sub_slug}.json")
+          security = load_json(f"/tmp/security-{sub_slug}.json")
+          compliance = load_json(f"/tmp/compliance-{sub_slug}.json")
 
-          # Count resources
           resources = inventory.get("data", [])
           total_resources = sum(r.get("count_", 0) for r in resources)
           regions = list(set(r.get("location", "unknown") for r in resources))
 
-          # Load rules to check passed vs findings
-          rules_dir = "rules"
+          # Load rules
           all_rules = []
-          for root, dirs, files in os.walk(rules_dir):
+          for root, dirs, files in os.walk("rules"):
               for f in files:
                   if f.endswith(".md"):
-                      path = os.path.join(root, f)
-                      with open(path) as fh:
+                      with open(os.path.join(root, f)) as fh:
                           content = fh.read()
                       for m in re.finditer(r'\*\*Rule ID:\*\*\s*((?:SEC|REL|COST|OPS|PERF|GOV)-\d{3})', content):
                           all_rules.append(m.group(1))
 
-          # For automated assessment, mark non-compliant policies as findings
           non_compliant = compliance.get("data", [])
 
-          # Build baseline JSON
           baseline = {
               "metadata": {
                   "subscription_id": sub_id,
+                  "subscription_name": sub_name,
                   "date": timestamp,
                   "total_resources": total_resources,
                   "regions": regions,
@@ -173,38 +195,43 @@ jobs:
           }
 
           os.makedirs("baselines", exist_ok=True)
-          outpath = f"baselines/baseline-{timestamp}.json"
+          outpath = f"baselines/baseline-{sub_slug}-{timestamp}.json"
           with open(outpath, "w") as f:
               json.dump(baseline, f, indent=2)
 
-          print(f"Baseline saved to {outpath}")
-          print(f"Resources: {total_resources}, Regions: {len(regions)}, Rules: {len(all_rules)}")
+          print(f"Baseline: {outpath} | Resources: {total_resources} | Regions: {len(regions)}")
 
-          # Set output for next steps
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"baseline_path={outpath}\n")
-              f.write(f"total_resources={total_resources}\n")
+              f.write(f"baseline_{sub_slug}={outpath}\n")
           PYTHON
 
-      - name: Drift detection (compare with previous baseline)
+            BASELINE_PATH="baselines/baseline-${SUB_SLUG}-${TIMESTAMP}.json"
+            BASELINE_PATHS="${BASELINE_PATHS} ${BASELINE_PATH}"
+            SUB_SUMMARIES="${SUB_SUMMARIES}\n| \`${SUB_ID}\` | ${SUB_NAME} | ${BASELINE_PATH} |"
+          done
+
+          echo "baseline_paths=$BASELINE_PATHS" >> $GITHUB_ENV
+          echo "sub_summaries<<EOF" >> $GITHUB_ENV
+          echo -e "$SUB_SUMMARIES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Drift detection (compare with previous baselines)
         id: drift
         run: |
-          # Find previous baseline
-          BASELINES=$(ls -t baselines/baseline-*.json 2>/dev/null | head -2)
-          BASELINE_COUNT=$(echo "$BASELINES" | wc -l)
-
-          if [ "$BASELINE_COUNT" -ge 2 ]; then
-            CURRENT=$(echo "$BASELINES" | head -1)
-            PREVIOUS=$(echo "$BASELINES" | tail -1)
-            echo "Comparing $CURRENT with $PREVIOUS"
-            python3 scripts/compare-assessments.py \
-              --baseline "$PREVIOUS" \
-              --current "$CURRENT" || true
-            echo "drift_detected=true" >> $GITHUB_OUTPUT
-          else
-            echo "No previous baseline found — skipping drift detection"
-            echo "drift_detected=false" >> $GITHUB_OUTPUT
-          fi
+          DRIFT_FOUND=false
+          for CURRENT in ${{ env.baseline_paths }}; do
+            # Extract subscription slug from filename
+            SLUG=$(echo "$CURRENT" | sed 's|baselines/baseline-||;s|-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\.json||')
+            # Find the previous baseline for the same subscription
+            PREVIOUS=$(ls -t baselines/baseline-${SLUG}-*.json 2>/dev/null | grep -v "$CURRENT" | head -1)
+            if [ -n "$PREVIOUS" ]; then
+              echo "Drift check: $CURRENT vs $PREVIOUS"
+              python3 scripts/compare-assessments.py \
+                --baseline "$PREVIOUS" \
+                --current "$CURRENT" || DRIFT_FOUND=true
+            fi
+          done
+          echo "drift_detected=$DRIFT_FOUND" >> $GITHUB_OUTPUT
 
       - name: Generate trend dashboard
         if: always()
@@ -215,6 +242,15 @@ jobs:
               --output trend-dashboard.html || true
           fi
 
+      - name: Generate score badge
+        if: always()
+        run: |
+          if [ -f scripts/generate-badge.py ]; then
+            python3 scripts/generate-badge.py \
+              --baselines-dir baselines/ \
+              --output badge/score.json || true
+          fi
+
       - name: Create issues from findings
         if: inputs.create_issues == true || inputs.create_issues == ''
         env:
@@ -223,28 +259,23 @@ jobs:
           SEVERITY="${{ inputs.severity_filter || 'Critical High' }}"
           MILESTONE="Assessment ${{ env.timestamp }}"
 
-          # Find the latest HTML report
-          REPORT=$(ls -t assessment-*.html 2>/dev/null | head -1)
-          if [ -n "$REPORT" ]; then
+          for REPORT in assessment-*.html; do
+            [ -f "$REPORT" ] || continue
             echo "Creating issues from $REPORT (severity: $SEVERITY)"
             python3 scripts/create-issues-from-report.py \
               --report "$REPORT" \
               --severity $SEVERITY \
               --milestone "$MILESTONE" || true
-          else
-            echo "No HTML report found — skipping issue creation"
-          fi
+          done
 
-      - name: Commit baseline and trend dashboard
+      - name: Commit baseline, dashboard, and badge
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add baselines/ trend-dashboard.html 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "chore: save assessment baseline ${{ env.timestamp }}
+          git add baselines/ trend-dashboard.html badge/ 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "chore: save assessment baselines ${{ env.timestamp }}
 
-          Automated assessment run.
-          Resources: ${{ steps.baseline.outputs.total_resources }}
-          Subscription: ${{ env.subscription_id }}"
+          Automated assessment run (${{ steps.subs.outputs.subscription_count }} subscriptions)."
           git push || true
 
       - name: Upload artifacts
@@ -254,8 +285,9 @@ jobs:
           name: assessment-${{ env.timestamp }}-${{ github.run_number }}
           path: |
             assessment-*.html
-            baselines/baseline-${{ env.timestamp }}.json
+            baselines/baseline-*-${{ env.timestamp }}.json
             trend-dashboard.html
+            badge/
           retention-days: 90
 
       - name: Post summary
@@ -263,11 +295,13 @@ jobs:
         run: |
           echo "## 📊 Assessment Summary — ${{ env.timestamp }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Subscription ID | Name | Baseline |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo -e "${{ env.sub_summaries }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Subscription | \`${{ env.subscription_id }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Resources | ${{ steps.baseline.outputs.total_resources }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Baseline | \`baselines/baseline-${{ env.timestamp }}.json\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Subscriptions assessed | ${{ steps.subs.outputs.subscription_count }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Drift detected | ${{ steps.drift.outputs.drift_detected }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📁 [Download artifacts](../actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
