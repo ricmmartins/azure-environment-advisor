@@ -255,6 +255,46 @@ _Rule: `{finding.rule_id}` | Pillar: {finding.pillar} | Severity: {finding.sever
     return body
 
 
+LABEL_COLORS = {
+    "pillar:security": "d73a4a",
+    "pillar:reliability": "0075ca",
+    "pillar:cost": "28a745",
+    "pillar:operations": "e4e669",
+    "pillar:performance": "5319e7",
+    "pillar:governance": "fbca04",
+    "severity:critical": "b60205",
+    "severity:high": "d93f0b",
+    "severity:medium": "f9d0c4",
+    "severity:low": "c5def5",
+    "assessment-finding": "1d76db",
+}
+
+_existing_labels: set[str] | None = None
+
+
+def ensure_labels_exist(labels: list[str]) -> None:
+    """Create any labels that don't already exist in the repo."""
+    global _existing_labels
+    if _existing_labels is None:
+        try:
+            result = subprocess.run(
+                ["gh", "label", "list", "--limit", "200", "--json", "name", "-q", ".[].name"],
+                capture_output=True, text=True, timeout=15,
+            )
+            _existing_labels = set(result.stdout.strip().splitlines()) if result.returncode == 0 else set()
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            _existing_labels = set()
+
+    for label in labels:
+        if label not in _existing_labels:
+            color = LABEL_COLORS.get(label, "ededed")
+            subprocess.run(
+                ["gh", "label", "create", label, "--color", color, "--force"],
+                capture_output=True, text=True, timeout=15,
+            )
+            _existing_labels.add(label)
+
+
 def create_github_issue(finding: Finding, labels: list[str], dry_run: bool = False) -> bool:
     """Create a GitHub Issue using the GitHub CLI."""
     title = f"[{finding.severity}] {finding.rule_id} — {finding.title}"
@@ -271,6 +311,8 @@ def create_github_issue(finding: Finding, labels: list[str], dry_run: bool = Fal
         print(f"  [DRY RUN] Would create issue: {title}")
         print(f"            Labels: {label_str}")
         return True
+
+    ensure_labels_exist(all_labels)
 
     try:
         cmd = [
