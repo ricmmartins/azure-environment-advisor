@@ -289,19 +289,24 @@ The dashboard includes:
 
 ## Knowledge Base Structure
 
-The agent's intelligence comes from a `.github/copilot-instructions.md` file that encodes best-practice rules. Rules are organized as assessable checks:
+The agent's intelligence comes from **modular Copilot Skills** in `.github/skills/` backed by a curated rules library in `rules/`. Each skill handles one phase of the assessment (discover, profile, assess, report, etc.) and shares common knowledge via `.github/skills/shared/`. Rules are organized as assessable checks:
 
 ```markdown
-## Assessment Rule: SEC-001 — Public Database Endpoints
+## SEC-001 — Public Database Endpoints
 
-**Pillar:** Security
-**Severity:** Critical
-**Check:** Query all SQL/PostgreSQL/MySQL/Cosmos DB resources. If `publicNetworkAccess` is `Enabled` and no Private Endpoint exists → flag.
-**Recommendation:** Enable Private Endpoint on `snet-data` subnet, disable public network access.
-**Context:**
-- Startup: Flag as High (may need public access during early development)
-- Scale-up/Enterprise: Flag as Critical
-**Learn More:** [Microsoft Learn link for remediation guidance]
+- **Pillar:** Security
+- **Severity:** Critical
+- **Profiles:** Startup: High, Scale-up: Critical, Enterprise: Critical
+
+### What to Check
+Query all SQL/PostgreSQL/MySQL/Cosmos DB resources. If `publicNetworkAccess`
+is `Enabled` and no Private Endpoint exists → flag.
+
+### Finding Template
+**Recommendation:** Enable Private Endpoint, disable public network access.
+
+### Learn More
+- [Use private endpoints for Azure SQL Database](https://learn.microsoft.com/azure/...)
 ```
 
 ## Project Structure
@@ -590,7 +595,7 @@ code .
 Assess my Azure subscription
 ```
 
-Copilot will read the `.github/copilot-instructions.md` file, connect to Azure via the MCP Server, and start the assessment.
+Copilot will auto-discover the skills from `.github/skills/`, connect to Azure via the MCP Server, and start the assessment.
 
 **Alternative — In GitHub Copilot CLI:**
 
