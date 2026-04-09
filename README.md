@@ -20,6 +20,36 @@ Then **pick one**:
 
 👉 [Full setup guide](#getting-started) · [Sample report](https://htmlpreview.github.io/?https://github.com/ricmmartins/azure-environment-advisor/blob/main/samples/sample-report.html) · [Example issues](https://github.com/ricmmartins/azure-environment-advisor/issues)
 
+## Skills
+
+The project is organized as modular **GitHub Copilot Skills** — each skill is a focused, invokable unit that Copilot auto-discovers from `.github/skills/`.
+
+### Run a Full Assessment
+
+| Skill | What it does |
+|-------|-------------|
+| **Full Assessment** | Complete end-to-end: discover → profile → assess → report → baseline |
+
+```text
+/azea-full-assessment Subscription `<your-subscription-id>`
+```
+
+### Individual Skills
+
+| Skill | What it does |
+|-------|-------------|
+| **Discover** | Connect to subscription(s), run all Resource Graph queries, build inventory |
+| **Profile** | Determine environment stage (startup / scale-up / enterprise) |
+| **Assess** | Evaluate all WAF rules with profile-adjusted severity |
+| **Report** | Generate self-contained HTML dashboard |
+| **Baseline** | Save JSON baseline, compare for drift, generate trend dashboard |
+| **Compliance Map** | Enrich findings with SOC2, ISO 27001, HIPAA, PCI-DSS, NIST-CSF mappings |
+| **Create Issues** | Create GitHub Issues from findings for tracking |
+
+Skills can be chained manually or run independently. Each skill includes instructions for standalone execution.
+
+> **Claude Code support**: Rename `.github` → `.claude` for Claude Code compatibility.
+
 ## The Problem
 
 Teams deploying on Azure today face a fragmented landscape of advisory tools:
@@ -279,7 +309,33 @@ The agent's intelligence comes from a `.github/copilot-instructions.md` file tha
 ```
 azure-environment-advisor/
 ├── .github/
-│   ├── copilot-instructions.md       # Agent behavior + assessment methodology
+│   ├── copilot-instructions.md       # Routing + overview (skills handle the logic)
+│   ├── skills/
+│   │   ├── azea-full-assessment/     # Orchestrator: chains all skills
+│   │   │   └── SKILL.md
+│   │   ├── azea-discover/            # Phase 1+2: Connect + Discover
+│   │   │   └── SKILL.md
+│   │   ├── azea-profile/             # Phase 3: Profile environment
+│   │   │   └── SKILL.md
+│   │   ├── azea-assess/              # Phase 4: Assess against rules
+│   │   │   └── SKILL.md
+│   │   ├── azea-report/              # Phase 5: Generate HTML report
+│   │   │   └── SKILL.md
+│   │   ├── azea-baseline/            # Phase 6+9: Baseline + Drift + Trends
+│   │   │   └── SKILL.md
+│   │   ├── azea-compliance-map/      # Phase 7: Compliance mapping
+│   │   │   └── SKILL.md
+│   │   ├── azea-create-issues/       # Phase 8: GitHub issue creation
+│   │   │   └── SKILL.md
+│   │   └── shared/                   # Shared knowledge for all skills
+│   │       ├── procedures/
+│   │       │   ├── azure-authentication.md  # Auth check (HARD GATE)
+│   │       │   └── mcp-query-execution.md   # How to run KQL via MCP
+│   │       ├── assessment-model.md   # Finding/metadata data model
+│   │       ├── rule-format.md        # How rules in rules/ are structured
+│   │       ├── profile-detection.md  # Profile signal thresholds + matching
+│   │       ├── severity-calculation.md # Scoring formula and colors
+│   │       └── report-conventions.md # HTML template, CSS, JS conventions
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── new-rule-request.yml      # Template: propose a new assessment rule
 │   │   ├── false-positive.yml        # Template: report a false positive finding
