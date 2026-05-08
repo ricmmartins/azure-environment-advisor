@@ -12,7 +12,7 @@ Run a complete end-to-end Azure environment assessment by orchestrating all skil
 
 **Input**: One or more Azure subscription IDs, subscription names, or a management group ID. Optional flags: include compliance mapping, create GitHub issues, generate trend dashboard.
 
-**Tools required**: Azure MCP Server, File system tools, Terminal
+**Tools required**: Azure MCP Server, ARM MCP Server, File system tools, Terminal
 
 **Reference files**: This skill orchestrates all other `azea-*` skills and their shared references.
 
@@ -30,8 +30,9 @@ This is the **main entry point** — equivalent to "assess my Azure environment"
 
 Optional add-ons (if requested):
 6. **Compliance** (`azea-compliance-map`) — Add compliance framework mappings
-7. **Issues** (`azea-create-issues`) — Create GitHub Issues from findings
-8. **Trends** (`azea-baseline` trend mode) — Generate trend dashboard from historical baselines
+7. **Remediate** (`azea-remediate`) — Deploy ARM template fixes for findings (opt-in, requires confirmation)
+8. **Issues** (`azea-create-issues`) — Create GitHub Issues from findings
+9. **Trends** (`azea-baseline` trend mode) — Generate trend dashboard from historical baselines
 
 ---
 
@@ -94,6 +95,14 @@ If the user requested compliance mapping (or said "include compliance"):
 - Run `.github/skills/azea-compliance-map/SKILL.md`
 - Regenerate the report with compliance sections
 
+### 8b. Optional: Remediation
+
+If the user requested remediation (or said "fix findings", "remediate", "deploy fixes"):
+- Run `.github/skills/azea-remediate/SKILL.md`
+- **HARD GATE** — Requires explicit user confirmation for each deployment
+- After remediation, offer to re-run the assessment to verify fixes
+- This step is **never automatic** — even in full assessment mode, the user must explicitly request it
+
 ### 9. Optional: GitHub Issues
 
 If the user requested issue creation (or said "create issues"):
@@ -150,6 +159,7 @@ If multiple subscriptions were specified:
 Open the HTML report in any browser to explore findings interactively.
 
 ### What's Next?
+- `/azea-remediate` — Deploy ARM template fixes for findings (requires Contributor role)
 - `/azea-compliance-map` — Add compliance framework mappings to findings
 - `/azea-create-issues` — Create GitHub Issues for tracking remediation
 - `/azea-baseline` compare — Compare with a previous baseline to detect drift
@@ -160,7 +170,7 @@ Open the HTML report in any browser to explore findings interactively.
 
 ## Important Guidelines
 
-- **Read-only mode**: Never modify, create, or delete any Azure resource
+- **Read-only mode**: Never modify, create, or delete any Azure resource (except via `azea-remediate` with explicit user confirmation)
 - **Accuracy**: Only report findings confirmed from actual resource data
 - **Tone**: Professional and constructive — advisor, not auditor
 - **Completeness**: Assess every rule in `rules/` — skip none

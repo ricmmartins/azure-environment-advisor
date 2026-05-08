@@ -56,6 +56,9 @@ cat > .vscode/mcp.json <<EOF
       "env": {
         "AZURE_SUBSCRIPTION_ID": "$SUB_ID"
       }
+    },
+    "arm-mcp-server": {
+      "url": "https://aka.ms/JoinAzMgmtMCP"
     }
   }
 }
@@ -63,6 +66,8 @@ EOF
 
 echo ""
 echo "✅ Created .vscode/mcp.json with subscription: $SUB_ID"
+echo "   - Azure MCP Server (read-only resource access)"
+echo "   - ARM MCP Server (query intelligence + optional remediation)"
 echo ""
 echo "Next steps:"
 echo "  1. Open this folder in VS Code: code ."

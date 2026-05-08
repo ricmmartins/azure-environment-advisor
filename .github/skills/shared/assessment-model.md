@@ -44,6 +44,7 @@ Each assessment finding has this structure:
 | `resources_affected` | array | Yes | Resource names, resource groups, or resource IDs affected |
 | `learn_more` | array | Yes | 1–3 Microsoft Learn links with title and URL |
 | `compliance_refs` | array | No | Compliance framework mappings (added by azea-compliance-map) |
+| `remediation` | object | No | ARM template remediation metadata (added by azea-remediate) |
 
 ## Pillar Values
 
@@ -64,6 +65,34 @@ Each assessment finding has this structure:
 | `high` | Significant gap. Missing best practices that could cause outages, security incidents, or major cost overruns. |
 | `medium` | Notable improvement area. Environment works but doesn't follow recommended patterns. |
 | `low` | Minor optimization. Nice-to-have improvements, minor cost savings, polish items. |
+
+## Remediation Schema (Optional)
+
+When the `azea-remediate` skill is used, findings may include a remediation object:
+
+```json
+{
+  "remediation": {
+    "type": "arm-template",
+    "description": "Enable Private Endpoint for SQL Database",
+    "template_source": "generated | provided",
+    "resource_group": "rg-contoso-prod",
+    "status": "pending | deployed | failed | cancelled",
+    "deployment_name": "remediate-SEC-001-2026-05-08",
+    "requires_confirmation": true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Always `arm-template` for ARM MCP Server deployments |
+| `description` | string | Human-readable description of the remediation action |
+| `template_source` | string | `generated` (AI-created) or `provided` (from a known template) |
+| `resource_group` | string | Target resource group for the deployment |
+| `status` | string | Deployment status: pending, deployed, failed, cancelled |
+| `deployment_name` | string | ARM deployment name for tracking |
+| `requires_confirmation` | boolean | Always `true` — remediation never auto-deploys |
 
 ## Passed Check Schema
 
@@ -112,5 +141,6 @@ Each assessment finding has this structure:
 | `azea-report` | Consumes findings + metadata to generate HTML |
 | `azea-baseline` | Serializes findings to JSON for drift detection |
 | `azea-compliance-map` | Enriches findings with compliance_refs |
+| `azea-remediate` | Uses findings to deploy ARM template remediations |
 | `azea-create-issues` | Reads findings to create GitHub Issues |
 | `azea-full-assessment` | Orchestrates all of the above |

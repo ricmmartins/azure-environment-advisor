@@ -44,6 +44,7 @@ The project is organized as modular **GitHub Copilot Skills** — each skill is 
 | **Report** | Generate self-contained HTML dashboard |
 | **Baseline** | Save JSON baseline, compare for drift, generate trend dashboard |
 | **Compliance Map** | Enrich findings with SOC2, ISO 27001, HIPAA, PCI-DSS, NIST-CSF mappings |
+| **Remediate** | Deploy ARM template fixes for findings (opt-in, requires confirmation) |
 | **Create Issues** | Create GitHub Issues from findings for tracking |
 
 Skills can be chained manually or run independently. Each skill includes instructions for standalone execution.
@@ -66,13 +67,14 @@ Teams deploying on Azure today face a fragmented landscape of advisory tools:
 
 ## The Solution
 
-An AI agent (powered by GitHub Copilot + Azure MCP Server) that:
+An AI agent (powered by GitHub Copilot + Azure MCP Server + ARM MCP Server) that:
 
 1. **Connects** to your Azure subscription (read-only, via Azure MCP Server)
 2. **Discovers** everything deployed — resources, configurations, policies, networking, RBAC, security, monitoring
 3. **Assesses** against best practices across all 5 WAF pillars + Cloud Adoption Framework + Azure Landing Zone patterns
 4. **Contextualizes** recommendations based on your environment profile (startup, scale-up, enterprise)
 5. **Reports** by generating a self-contained HTML dashboard with findings, severity, remediation guidance, and direct links to Microsoft Learn documentation for each issue
+6. **Remediates** (opt-in) by deploying ARM template fixes via the ARM MCP Server, with explicit user confirmation for every change
 
 ## Architecture
 
@@ -87,38 +89,32 @@ An AI agent (powered by GitHub Copilot + Azure MCP Server) that:
 ┌─────────────────────────────────────────────────────────────┐
 │  Azure Environment Advisor Agent                            │
 │                                                             │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
-│  │ Discovery   │  │ Assessment   │  │ Report             │  │
-│  │ Engine      │→ │ Engine       │→ │ Generator          │  │
-│  │             │  │              │  │                    │  │
-│  │ • Resources │  │ • WAF Rules  │  │ • HTML dashboard   │  │
-│  │ • Configs   │  │ • CAF Rules  │  │ • Severity scores  │  │
-│  │ • Policies  │  │ • ALZ Rules  │  │ • MS Learn links   │  │
-│  │ • Networking│  │ • Custom     │  │ • Pillar breakdown │  │
-│  │ • RBAC      │  │   Rules      │  │ • Filters          │  │
-│  │ • Defender  │  │              │  │                    │  │
-│  │ • Monitoring│  │ Contextual:  │  │                    │  │
-│  │ • Budgets   │  │ • Stage      │  │                    │  │
-│  │             │  │ • Size       │  │                    │  │
-│  │             │  │ • Complexity │  │                    │  │
-│  └─────────────┘  └──────────────┘  └────────────────────┘  │
+│  ┌───────────┐  ┌────────────┐  ┌──────────┐  ┌──────────┐  │
+│  │ Discovery │  │ Assessment │  │ Report   │  │Remediate │  │
+│  │ Engine    │→ │ Engine     │→ │ Generator│→ │ Engine   │  │
+│  │           │  │            │  │          │  │ (opt-in) │  │
+│  │ • KQL     │  │ • WAF Rules│  │ • HTML   │  │ • ARM    │  │
+│  │ • Dynamic │  │ • CAF Rules│  │ • Scores │  │   deploy │  │
+│  │   queries │  │ • ALZ Rules│  │ • Links  │  │ • Monitor│  │
+│  │ • Configs │  │ • Dynamic  │  │ • Filters│  │ • Cancel │  │
+│  └───────────┘  └────────────┘  └──────────┘  └──────────┘  │
 └──────────────────────┬──────────────────────────────────────┘
                        │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Azure MCP Server (Read-Only Access)                        │
-│                                                             │
-│  Tools used:                                                │
-│  • Resource Graph queries (inventory)                       │
-│  • Resource configurations (detailed settings)              │
-│  • Policy assignments & compliance state                    │
-│  • Network topology (VNets, NSGs, peerings, route tables)   │
-│  • Defender for Cloud (plans, secure score, recommendations)│
-│  • RBAC role assignments                                    │
-│  • Diagnostic settings                                      │
-│  • Budget & cost data                                       │
-│  • Entra ID (groups, conditional access, MFA status)        │
-└─────────────────────────────────────────────────────────────┘
+          ┌────────────┴────────────┐
+          ▼                         ▼
+┌──────────────────────┐  ┌──────────────────────────────────┐
+│  Azure MCP Server    │  │  ARM MCP Server (Remote)          │
+│  (Read-Only Access)  │  │                                  │
+│                      │  │  Query Intelligence:             │
+│  Tools used:         │  │  • generate_query (NL → KQL)     │
+│  • Resource configs  │  │  • validate_query (syntax check) │
+│  • Log Analytics     │  │  • execute_query (run ARG query) │
+│  • Entra ID         │  │                                  │
+│  • Fallback queries  │  │  Deployments (opt-in):           │
+│                      │  │  • create_template_deployment    │
+│                      │  │  • get_deployment_status         │
+│                      │  │  • cancel_deployment             │
+└──────────────────────┘  └──────────────────────────────────┘
 ```
 
 ## Assessment Pillars
@@ -332,10 +328,13 @@ azure-environment-advisor/
 │   │   │   └── SKILL.md
 │   │   ├── azea-create-issues/       # Phase 8: GitHub issue creation
 │   │   │   └── SKILL.md
+│   │   ├── azea-remediate/           # Phase 9: ARM template remediation (opt-in)
+│   │   │   └── SKILL.md
 │   │   └── shared/                   # Shared knowledge for all skills
 │   │       ├── procedures/
 │   │       │   ├── azure-authentication.md  # Auth check (HARD GATE)
-│   │       │   └── mcp-query-execution.md   # How to run KQL via MCP
+│   │       │   ├── mcp-query-execution.md   # How to run KQL via MCP
+│   │       │   └── arm-mcp-server.md        # ARM MCP Server tools reference
 │   │       ├── assessment-model.md   # Finding/metadata data model
 │   │       ├── rule-format.md        # How rules in rules/ are structured
 │   │       ├── profile-detection.md  # Profile signal thresholds + matching
@@ -430,10 +429,11 @@ azure-environment-advisor/
 
 ## Technical Requirements
 
-- **Azure MCP Server** — for read-only subscription access
+- **Azure MCP Server** — for read-only subscription access (resource configs, Log Analytics, Entra ID)
+- **ARM MCP Server** — for query intelligence (generate, validate, execute ARG queries) and optional remediation (ARM template deployments)
 - **GitHub Copilot** (CLI, VS Code, or coding agent) — as the AI runtime
-- **Azure permissions** — Reader role on subscription(s) to assess
-- **No write access needed** — the agent only reads your environment and generates a report
+- **Azure permissions** — Reader role on subscription(s) to assess; Contributor role for optional remediation
+- **No write access needed for assessment** — the agent only reads your environment and generates a report. Write access (Contributor) is only needed for the optional remediation skill.
 
 ## Getting Started
 
@@ -443,6 +443,7 @@ azure-environment-advisor/
 - **GitHub Copilot** is an AI assistant built into VS Code (and the GitHub CLI). You type a request in plain English, and it executes multi-step tasks for you. In **Agent mode**, Copilot can use external tools — like the Azure MCP Server — to read data and act on it.
 - **MCP (Model Context Protocol)** is an open standard that lets AI assistants connect to external systems. Think of it as a "plugin" that gives Copilot the ability to read your Azure subscription.
 - **Azure MCP Server** is the specific MCP plugin for Azure. It gives Copilot **read-only** access to your subscription's resources, configurations, and policies — it cannot modify anything.
+- **ARM MCP Server** is a remote MCP server from Microsoft that adds specialized capabilities: generating Azure Resource Graph queries from natural language, validating queries before execution, and optionally deploying ARM templates for remediation.
 - **This repository** contains the assessment rules, queries, and report template. When you ask Copilot to "assess my Azure subscription," it reads these files, connects to Azure via MCP, and generates an HTML report.
 
 </details>
@@ -491,15 +492,27 @@ az account show --query "{Name:name, Id:id, State:state}" -o table
 > ```
 > If you don't see "Reader" (or a higher role like "Contributor" / "Owner"), ask your Azure administrator to assign the [Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#reader) built-in role to your account on the target subscription. Role assignments can take up to 5 minutes to take effect.
 
-### 3. Install Azure MCP Server
+### 3. Install MCP Servers
 
-You have three options (pick one):
+You need **two MCP servers** (both are recommended, but the project works with just the Azure MCP Server):
+
+#### Azure MCP Server (Resource Access — Required)
 
 - **VS Code extension (easiest):** Install the [Azure MCP Server Extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server) from the VS Code marketplace — no npm needed.
 - **Automatic via MCP config:** The `.vscode/mcp.json` config in the next step uses `npx`, which downloads the server automatically on first run — no separate install needed.
 - **Global install:** `npm install -g @azure/mcp` (requires Node.js 18+)
 
 > **Note:** Check the [Azure MCP Server documentation](https://learn.microsoft.com/azure/developer/azure-mcp-server/get-started) for the latest instructions.
+
+#### ARM MCP Server (Query Intelligence + Remediation — Recommended)
+
+The ARM MCP Server is a **remote server** — no local installation needed:
+
+1. Open [https://aka.ms/JoinAzMgmtMCP](https://aka.ms/JoinAzMgmtMCP) — VS Code launches and installs the server
+2. Sign in with your Azure credentials
+3. Verify tools are enabled: Open Chat → Configure Tools → ensure the 6 ARM MCP Server tools are listed
+
+> **What it adds:** Natural language → KQL query generation, query validation, optimized query execution, and optional ARM template deployments for remediation. See the [ARM MCP Server blog post](https://techcommunity.microsoft.com/blog/azuregovernanceandmanagementblog/introducing-the-azure-resource-manager-mcp-server/4517521) for details.
 
 ### 4. Clone This Repository
 
@@ -537,10 +550,15 @@ Then create `.vscode/mcp.json` with this content:
       "env": {
         "AZURE_SUBSCRIPTION_ID": "<your-subscription-id>"
       }
+    },
+    "arm": {
+      "url": "https://aka.ms/JoinAzMgmtMCP"
     }
   }
 }
 ```
+
+> **Two MCP servers**: The `azure` server provides general read-only resource access. The `arm` server adds query intelligence (natural language → KQL) and optional ARM template deployments for remediation. Both are recommended, but the project works with just the `azure` server.
 
 > **How VS Code picks this up:** VS Code automatically detects `.vscode/mcp.json` when you open the project folder. No extra settings needed — just restart VS Code after creating the file.
 
@@ -865,6 +883,41 @@ Each issue includes:
 >
 > **See it in action:** Check out the [example issues](https://github.com/ricmmartins/azure-environment-advisor/issues) created from a real assessment run.
 
+## Remediation (Opt-In)
+
+After an assessment, you can optionally remediate findings by deploying ARM templates directly via the ARM MCP Server:
+
+```text
+/azea-remediate
+```
+
+The remediation skill:
+- **Shows a plan** of which findings can be fixed via ARM templates
+- **Previews each deployment** before executing
+- **Requires explicit confirmation** for every change — never auto-deploys
+- **Monitors deployments** and offers cancellation if issues arise
+- **Only performs additive changes** — never deletes resources
+
+> **Permissions:** Remediation requires **Contributor** role on the target resource group. Assessment only needs Reader.
+
+Example workflow:
+```
+User: "Fix the critical findings"
+Agent: "I can remediate 2 of 3 critical findings via ARM templates:
+        1. SEC-001 — Deploy Private Endpoint for sql-contoso-prod
+        2. OPS-003 — Enable diagnostic settings on rg-contoso-prod
+        
+        SEC-005 requires manual action (subscription-level Defender).
+        
+        Shall I proceed? You'll confirm each deployment individually."
+User: "Yes"
+Agent: [previews SEC-001 deployment, asks for confirmation]
+User: "Go ahead"
+Agent: [deploys, monitors, reports success]
+```
+
+> **⚠️ Template quality:** AI-generated ARM templates should be reviewed carefully. For critical production resources, we recommend providing your own tested templates.
+
 ## Compliance Framework Mapping
 
 Findings are mapped to controls in 5 compliance frameworks:
@@ -919,6 +972,7 @@ The validator checks:
 | **CAF** | [Cloud Adoption Framework](https://learn.microsoft.com/azure/cloud-adoption-framework/) — Microsoft's guidance for cloud adoption strategy, planning, and governance |
 | **ALZ** | [Azure Landing Zone](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/landing-zone/) — A target architecture for enterprise Azure environments with management groups, networking, and governance |
 | **MCP** | [Model Context Protocol](https://modelcontextprotocol.io/) — An open protocol that allows AI agents to connect to external tools and data sources |
+| **ARM MCP Server** | [Azure Resource Manager MCP Server](https://aka.ms/JoinAzMgmtMCP) — Remote MCP server for ARG query intelligence and ARM template deployments |
 | **NSG** | Network Security Group — Azure's network-level firewall for controlling traffic to/from subnets and VMs |
 | **RBAC** | Role-Based Access Control — Azure's authorization system for managing who can do what on which resources |
 | **PIM** | Privileged Identity Management — Entra ID feature for just-in-time privileged access |
@@ -932,3 +986,5 @@ The validator checks:
 - **Rule marketplace** — community-contributed rule packs for specific industries (healthcare, finance, gaming)
 - **Integration with Azure Monitor** — correlate findings with actual availability/performance metrics
 - **Executive PDF export** — one-page summary for CISOs and compliance reviews
+- **Remediation template library** — curated, tested ARM templates for common findings
+- **Custom remediation policies** — org-specific approval workflows for ARM deployments

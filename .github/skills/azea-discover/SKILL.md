@@ -12,10 +12,11 @@ Connect to Azure subscription(s) and build a complete inventory of the environme
 
 **Input**: One or more Azure subscription IDs, subscription names, or a management group ID. If not provided, the skill will prompt.
 
-**Tools required**: Azure MCP Server (Resource Graph queries, resource details), Terminal (for `az` CLI fallback)
+**Tools required**: Azure MCP Server (Resource Graph queries, resource details), ARM MCP Server (query generation, validation, execution), Terminal (for `az` CLI fallback)
 
 **Reference files**:
 - `.github/skills/shared/assessment-model.md` — Shared data model
+- `.github/skills/shared/procedures/arm-mcp-server.md` — ARM MCP Server tool reference
 - `queries/resource-graph/inventory.kql` — Resource inventory query
 - `queries/resource-graph/networking.kql` — Networking topology query
 - `queries/resource-graph/security.kql` — Security posture query
@@ -68,7 +69,7 @@ If multiple subscriptions are provided (comma-separated, a list, or "all"):
 
 ### 3. Run Resource Graph Queries
 
-Follow `.github/skills/shared/procedures/mcp-query-execution.md` for each query. Execute in this order:
+Follow `.github/skills/shared/procedures/mcp-query-execution.md` for each query. Use the ARM MCP Server query pipeline when available (validate → execute), falling back to the Azure MCP Server if needed. Execute in this order:
 
 #### 3a. Resource Inventory
 Read and execute `queries/resource-graph/inventory.kql` to get:
@@ -129,6 +130,15 @@ Use the Azure MCP Server to also check:
 - **Autoscale settings** — are compute resources set to autoscale?
 - **Alert rules** — what monitoring alerts exist?
 - **Action groups** — who gets notified when alerts fire?
+
+### 5b. Dynamic Discovery (ARM MCP Server)
+
+If the ARM MCP Server is available, use `generate_query` to discover additional resource configurations not covered by the pre-written `.kql` files. Generate targeted queries for:
+- Resource types found in inventory that don't have specific queries (e.g., new Azure services)
+- Configuration details that existing queries don't capture
+- Cross-resource relationships not visible in standard queries
+
+Follow the dynamic generation pipeline in `.github/skills/shared/procedures/mcp-query-execution.md`.
 
 ### 6. Present Discovery Summary
 

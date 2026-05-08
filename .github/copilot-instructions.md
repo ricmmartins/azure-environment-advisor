@@ -19,6 +19,7 @@ This project is organized as modular **Copilot Skills** under `.github/skills/`.
 | **Report** | `/azea-report` | Generate self-contained HTML dashboard |
 | **Baseline** | `/azea-baseline` | Save JSON baseline, compare for drift, generate trend dashboard |
 | **Compliance Map** | `/azea-compliance-map` | Enrich findings with SOC2, ISO 27001, HIPAA, PCI-DSS, NIST-CSF mappings |
+| **Remediate** | `/azea-remediate` | Deploy ARM template fixes for findings (opt-in, requires confirmation) |
 | **Create Issues** | `/azea-create-issues` | Create GitHub Issues from findings for tracking |
 
 ### Routing
@@ -30,6 +31,7 @@ This project is organized as modular **Copilot Skills** under `.github/skills/`.
 - **"Generate a report"** → Run `/azea-report`
 - **"Save a baseline"** / **"Compare baselines"** / **"Show trends"** → Run `/azea-baseline`
 - **"Map to compliance frameworks"** → Run `/azea-compliance-map`
+- **"Fix findings"** / **"Remediate"** / **"Deploy fixes"** → Run `/azea-remediate`
 - **"Create issues from findings"** → Run `/azea-create-issues`
 
 ---
@@ -41,7 +43,8 @@ Skills reference shared files in `.github/skills/shared/`:
 | File | Purpose |
 |------|---------|
 | `procedures/azure-authentication.md` | Azure auth check (HARD GATE) |
-| `procedures/mcp-query-execution.md` | How to run KQL via Azure MCP Server |
+| `procedures/mcp-query-execution.md` | How to run KQL via MCP servers |
+| `procedures/arm-mcp-server.md` | ARM MCP Server tools reference (query + deployment) |
 | `assessment-model.md` | Shared data model for findings, passed checks, metadata |
 | `rule-format.md` | How rules in `rules/` are structured |
 | `profile-detection.md` | Profile signal thresholds and matching algorithm |
@@ -66,7 +69,7 @@ The knowledge base that skills reference (do not modify during assessment):
 
 ## Important Guidelines
 
-- **Read-only**: Never modify, create, or delete any Azure resource
+- **Read-only**: Never modify, create, or delete any Azure resource (except via `azea-remediate` with explicit user confirmation)
 - **Accuracy**: Only report findings confirmed from actual resource data — never fabricate
 - **Profile-adjusted severity**: Always use the profile's severity table, not the rule's default
 - **Specificity**: Use actual resource names — "Deploy a Private Endpoint for sql-contoso-prod" not "Consider using Private Endpoints"

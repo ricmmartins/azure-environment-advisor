@@ -12,12 +12,13 @@ Evaluate the environment against every rule in `rules/`, applying profile-adjust
 
 **Input**: Discovery data from `azea-discover` and profile from `azea-profile` (preferred). Can self-discover and self-profile if run standalone.
 
-**Tools required**: Azure MCP Server (for additional KQL queries from rules), File system tools (to read rule files)
+**Tools required**: Azure MCP Server (for additional KQL queries from rules), ARM MCP Server (for dynamic query generation and validation), File system tools (to read rule files)
 
 **Reference files**:
 - `.github/skills/shared/assessment-model.md` — Finding data model
 - `.github/skills/shared/rule-format.md` — How rules are structured
 - `.github/skills/shared/severity-calculation.md` — Scoring methodology
+- `.github/skills/shared/procedures/arm-mcp-server.md` — ARM MCP Server tool reference
 - `rules/security/*.md` — Security assessment rules
 - `rules/reliability/*.md` — Reliability assessment rules
 - `rules/cost/*.md` — Cost optimization rules
@@ -76,6 +77,11 @@ If the rule targets a resource type that doesn't exist in the discovery data (e.
 If the rule's "What to Check" section includes a KQL query:
 - Execute it against the discovery data or run it via Azure MCP Server
 - Follow `.github/skills/shared/procedures/mcp-query-execution.md`
+
+If the rule describes what to check but does **not** include a KQL query:
+- Use the ARM MCP Server's `generate_query` tool to create a query from the rule description
+- Follow the dynamic generation pipeline in `.github/skills/shared/procedures/mcp-query-execution.md`
+- This enables assessment of rules that rely on natural language descriptions rather than pre-written KQL
 
 If the check relies on data already collected during discovery, evaluate against that data directly.
 
